@@ -1,4 +1,4 @@
-TARGETNAME=dokannp
+TARGETNAME=fusernp
 TARGETTYPE=DYNLINK
 
 USE_NTDLL=0
@@ -8,11 +8,11 @@ C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
 TARGETLIBS=$(SDK_LIB_PATH)\user32.lib \
 		$(SDK_LIB_PATH)\kernel32.lib
 
-INCLUDES=..\dokan; \
+INCLUDES=..\fuser; \
     $(IFSKIT_INC_PATH); \
     $(DDK_INC_PATH)
 
-SOURCES=dokannp.c
+SOURCES=fusernp.c
 
 UMTYPE=console
 UMBASE=0x400000

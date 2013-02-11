@@ -6,7 +6,7 @@
 #include <strsafe.h>
 
 static VOID
-DokanDbgPrintW(LPCWSTR format, ...)
+FuserDbgPrintW(LPCWSTR format, ...)
 {
 	WCHAR buffer[512];
 	va_list argp;
@@ -17,7 +17,7 @@ DokanDbgPrintW(LPCWSTR format, ...)
 }
 
 #define DbgPrintW(format, ...) \
-	DokanDbgPrintW(format, __VA_ARGS__)
+	FuserDbgPrintW(format, __VA_ARGS__)
 
 DWORD APIENTRY
 NPGetCaps(
