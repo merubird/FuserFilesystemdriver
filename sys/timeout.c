@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,12 +18,11 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-
-#include "dokan.h"
+#include "fuser.h"
 
 VOID
-DokanUnmount(
-	__in PDokanDCB Dcb
+FuserUnmount( // TODO: does not belong in the timeout-file in my opinion
+	__in PFuserDCB Dcb
 	)
 {
 	ULONG					eventLength;
@@ -32,15 +30,15 @@ DokanUnmount(
 	PDRIVER_EVENT_CONTEXT	driverEventContext;	
 	PKEVENT					completedEvent;
 	LARGE_INTEGER			timeout;
-	PDokanVCB				vcb = Dcb->Vcb;
+	PFuserVCB				vcb = Dcb->Vcb;
 	ULONG					deviceNamePos;
 
 	eventLength = sizeof(EVENT_CONTEXT);
 	eventContext = AllocateEventContextRaw(eventLength);
-				
+
 	if (eventContext == NULL) {
 		;//STATUS_INSUFFICIENT_RESOURCES;
-		DokanEventRelease(vcb->DeviceObject);
+		FuserEventRelease(vcb->DeviceObject);
 		return;
 	}
 
@@ -59,16 +57,15 @@ DokanUnmount(
 			sizeof(eventContext->Unmount.DeviceName) / sizeof(WCHAR),
 			&(Dcb->SymbolicLinkName->Buffer[deviceNamePos]));
 
-	DDbgPrint("  Send Unmount to Service : %ws\n", eventContext->Unmount.DeviceName);
+	FDbgPrint("  Send Unmount to Service : %ws\n", eventContext->Unmount.DeviceName);
 
-	DokanEventNotification(&Dcb->Global->NotifyService, eventContext);
-
+	FuserEventNotification(&Dcb->Global->NotifyService, eventContext);
 	if (completedEvent) {
 		timeout.QuadPart = -1 * 10 * 1000 * 10; // 10 sec
 		KeWaitForSingleObject(completedEvent, Executive, KernelMode, FALSE, &timeout);
 	}
 
-	DokanEventRelease(vcb->DeviceObject);
+	FuserEventRelease(vcb->DeviceObject);
 
 	if (completedEvent) {
 		ExFreePool(completedEvent);
@@ -76,51 +73,11 @@ DokanUnmount(
 }
 
 
-VOID
-DokanCheckKeepAlive(
-	__in PDokanDCB	Dcb
-	)
-{
-	LARGE_INTEGER		tickCount;
-	ULONG				eventLength;
-	PEVENT_CONTEXT		eventContext;
-	ULONG				mounted;
-	PDokanVCB			vcb = Dcb->Vcb;
-
-	//DDbgPrint("==> DokanCheckKeepAlive\n");
-
-	KeEnterCriticalRegion();
-	KeQueryTickCount(&tickCount);
-	ExAcquireResourceSharedLite(&Dcb->Resource, TRUE);
-
-	if (Dcb->TickCount.QuadPart < tickCount.QuadPart) {
-
-		mounted = Dcb->Mounted;
-
-		ExReleaseResourceLite(&Dcb->Resource);
-
-		DDbgPrint("  Timeout, force to umount\n");
-
-		if (!mounted) {
-			// not mounted
-			KeLeaveCriticalRegion();
-			return;
-		}
-		DokanUnmount(Dcb);
-
-	} else {
-		ExReleaseResourceLite(&Dcb->Resource);
-	}
-
-	KeLeaveCriticalRegion();
-	//DDbgPrint("<== DokanCheckKeepAlive\n");
-}
-
 
 
 NTSTATUS
 ReleaseTimeoutPendingIrp(
-   __in PDokanDCB	Dcb
+   __in PFuserDCB	Dcb
    )
 {
 	KIRQL				oldIrql;
@@ -130,7 +87,7 @@ ReleaseTimeoutPendingIrp(
 	LIST_ENTRY			completeList;
 	PIRP				irp;
 
-	DDbgPrint("==> ReleaseTimeoutPendingIRP\n");
+	FDbgPrint("==> ReleaseTimeoutPendingIRP\n");
 	InitializeListHead(&completeList);
 
 	ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL);
@@ -139,7 +96,7 @@ ReleaseTimeoutPendingIrp(
 	// when IRP queue is empty, there is nothing to do
 	if (IsListEmpty(&Dcb->PendingIrp.ListHead)) {
 		KeReleaseSpinLock(&Dcb->PendingIrp.ListLock, oldIrql);
-		DDbgPrint("  IrpQueue is Empty\n");
+		FDbgPrint("  IrpQueue is Empty\n");
 		return STATUS_SUCCESS;
 	}
 
@@ -147,7 +104,6 @@ ReleaseTimeoutPendingIrp(
 
 	// search timeout IRP through pending IRP list
 	listHead = &Dcb->PendingIrp.ListHead;
-
     for (thisEntry = listHead->Flink;
 		thisEntry != listHead;
 		thisEntry = nextEntry) {
@@ -163,14 +119,14 @@ ReleaseTimeoutPendingIrp(
 
 		RemoveEntryList(thisEntry);
 
-		DDbgPrint(" timeout Irp #%X\n", irpEntry->SerialNumber);
+		FDbgPrint(" timeout Irp #%X\n", irpEntry->SerialNumber);
 
 		irp = irpEntry->Irp;
 
 		if (irp == NULL) {
 			// this IRP has already been canceled
 			ASSERT(irpEntry->CancelRoutineFreeMemory == FALSE);
-			DokanFreeIrpEntry(irpEntry);
+			FuserFreeIrpEntry(irpEntry);
 			continue;
 		}
 
@@ -186,7 +142,6 @@ ReleaseTimeoutPendingIrp(
 		irp->Tail.Overlay.DriverContext[DRIVER_CONTEXT_IRP_ENTRY] = NULL;
 		InsertTailList(&completeList, &irpEntry->ListEntry);
 	}
-
 	if (IsListEmpty(&Dcb->PendingIrp.ListHead)) {
 		KeClearEvent(&Dcb->PendingIrp.NotEmpty);
 	}
@@ -198,17 +153,145 @@ ReleaseTimeoutPendingIrp(
 		irp = irpEntry->Irp;
 		irp->IoStatus.Information = 0;
 		irp->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
-		DokanFreeIrpEntry(irpEntry);
+		FuserFreeIrpEntry(irpEntry);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 
-	DDbgPrint("<== ReleaseTimeoutPendingIRP\n");
+	FDbgPrint("<== ReleaseTimeoutPendingIRP\n");
+	
+	return STATUS_SUCCESS;
+}
+
+VOID
+FuserCheckKeepAlive(
+	__in PFuserDCB	Dcb
+	)
+{
+	LARGE_INTEGER		tickCount;
+	ULONG				eventLength;
+	PEVENT_CONTEXT		eventContext;
+	ULONG				mounted;
+	PFuserVCB			vcb = Dcb->Vcb;
+
+	//FDbgPrint("==> FuserCheckKeepAlive\n");
+
+	KeEnterCriticalRegion();
+	KeQueryTickCount(&tickCount);
+	ExAcquireResourceSharedLite(&Dcb->Resource, TRUE);
+
+	if (Dcb->TickCount.QuadPart < tickCount.QuadPart) {
+
+		mounted = Dcb->Mounted;
+
+		ExReleaseResourceLite(&Dcb->Resource);
+
+		FDbgPrint("  Timeout, force to umount\n");
+
+		if (!mounted) {
+			// not mounted
+			KeLeaveCriticalRegion();
+			return;
+		}
+		FuserUnmount(Dcb);
+
+	} else {
+		ExReleaseResourceLite(&Dcb->Resource);
+	}	
+	KeLeaveCriticalRegion();
+	//FDbgPrint("<== FuserCheckKeepAlive\n");
+}
+
+
+
+
+KSTART_ROUTINE FuserTimeoutThread;
+VOID
+FuserTimeoutThread(
+	PFuserDCB	Dcb)
+/*++
+
+Routine Description:
+
+	checks wheter pending IRP is timeout or not each FUSER_CHECK_INTERVAL
+
+--*/
+{
+	NTSTATUS		status;
+	KTIMER			timer;
+	PVOID			pollevents[2];
+	LARGE_INTEGER	timeout = {0};
+	FDbgPrint("==> FuserTimeoutThread\n");
+
+	KeInitializeTimerEx(&timer, SynchronizationTimer);
+	
+	pollevents[0] = (PVOID)&Dcb->KillEvent;
+	pollevents[1] = (PVOID)&timer;
+
+	KeSetTimerEx(&timer, timeout, FUSER_CHECK_INTERVAL, NULL);
+	while (TRUE) {
+		status = KeWaitForMultipleObjects(2, pollevents, WaitAny,
+			Executive, KernelMode, FALSE, NULL, NULL);
+		
+		if (!NT_SUCCESS(status) || status ==  STATUS_WAIT_0) {
+			FDbgPrint("  FuserTimeoutThread catched KillEvent\n");
+			// KillEvent or something error is occured
+			break;
+		}
+
+		ReleaseTimeoutPendingIrp(Dcb);
+		if (Dcb->UseKeepAlive)
+			FuserCheckKeepAlive(Dcb);
+	}
+
+	KeCancelTimer(&timer);
+
+	FDbgPrint("<== FuserTimeoutThread\n");
+
+	PsTerminateSystemThread(STATUS_SUCCESS);
+}
+
+
+
+NTSTATUS
+FuserStartCheckThread(
+	__in PFuserDCB	Dcb)
+/*++
+
+Routine Description:
+
+	execute FuserTimeoutThread
+
+--*/
+{
+	NTSTATUS status;
+	HANDLE	thread;
+
+	FDbgPrint("==> FuserStartCheckThread\n");
+
+	status = PsCreateSystemThread(&thread, THREAD_ALL_ACCESS,
+		NULL, NULL, NULL, (PKSTART_ROUTINE)FuserTimeoutThread, Dcb);
+
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	ObReferenceObjectByHandle(thread, THREAD_ALL_ACCESS, NULL,
+		KernelMode, (PVOID*)&Dcb->TimeoutThread, NULL);
+
+	ZwClose(thread);
+
+	FDbgPrint("<== FuserStartCheckThread\n");
+
 	return STATUS_SUCCESS;
 }
 
 
+
+
+
+
 NTSTATUS
-DokanResetPendingIrpTimeout(
+FuserResetPendingIrpTimeout(
    __in PDEVICE_OBJECT	DeviceObject,
    __in PIRP			Irp
    )
@@ -216,19 +299,19 @@ DokanResetPendingIrpTimeout(
 	KIRQL				oldIrql;
     PLIST_ENTRY			thisEntry, nextEntry, listHead;
 	PIRP_ENTRY			irpEntry;
-	PDokanVCB			vcb;
+	PFuserVCB			vcb;
 	PEVENT_INFORMATION	eventInfo;
 	ULONG				timeout; // in milisecond
 
 
-	DDbgPrint("==> ResetPendingIrpTimeout\n");
+	FDbgPrint("==> ResetPendingIrpTimeout\n");
 
 	eventInfo		= (PEVENT_INFORMATION)Irp->AssociatedIrp.SystemBuffer;
 	ASSERT(eventInfo != NULL);
 
 	timeout = eventInfo->ResetTimeout.Timeout;
-	if (DOKAN_IRP_PENDING_TIMEOUT_RESET_MAX < timeout) {
-		timeout = DOKAN_IRP_PENDING_TIMEOUT_RESET_MAX;
+	if (FUSER_IRP_PENDING_TIMEOUT_RESET_MAX < timeout) {
+		timeout = FUSER_IRP_PENDING_TIMEOUT_RESET_MAX;
 	}
 	
 	vcb = DeviceObject->DeviceExtension;
@@ -240,7 +323,6 @@ DokanResetPendingIrpTimeout(
 
 	// search corresponding IRP through pending IRP list
 	listHead = &vcb->Dcb->PendingIrp.ListHead;
-
     for (thisEntry = listHead->Flink; thisEntry != listHead; thisEntry = nextEntry) {
 
 		PIRP				irp;
@@ -254,110 +336,42 @@ DokanResetPendingIrpTimeout(
 			continue;
 		}
 
-		DokanUpdateTimeout(&irpEntry->TickCount, timeout);
+		FuserUpdateTimeout(&irpEntry->TickCount, timeout);
 		break;
 	}
 	KeReleaseSpinLock(&vcb->Dcb->PendingIrp.ListLock, oldIrql);
-	DDbgPrint("<== ResetPendingIrpTimeout\n");
-	return STATUS_SUCCESS;
-}
-
-
-KSTART_ROUTINE DokanTimeoutThread;
-VOID
-DokanTimeoutThread(
-	PDokanDCB	Dcb)
-/*++
-
-Routine Description:
-
-	checks wheter pending IRP is timeout or not each DOKAN_CHECK_INTERVAL
-
---*/
-{
-	NTSTATUS		status;
-	KTIMER			timer;
-	PVOID			pollevents[2];
-	LARGE_INTEGER	timeout = {0};
-
-	DDbgPrint("==> DokanTimeoutThread\n");
-
-	KeInitializeTimerEx(&timer, SynchronizationTimer);
-	
-	pollevents[0] = (PVOID)&Dcb->KillEvent;
-	pollevents[1] = (PVOID)&timer;
-
-	KeSetTimerEx(&timer, timeout, DOKAN_CHECK_INTERVAL, NULL);
-	
-	while (TRUE) {
-		status = KeWaitForMultipleObjects(2, pollevents, WaitAny,
-			Executive, KernelMode, FALSE, NULL, NULL);
+	FDbgPrint("<== ResetPendingIrpTimeout\n");
 		
-		if (!NT_SUCCESS(status) || status ==  STATUS_WAIT_0) {
-			DDbgPrint("  DokanTimeoutThread catched KillEvent\n");
-			// KillEvent or something error is occured
-			break;
-		}
-
-		ReleaseTimeoutPendingIrp(Dcb);
-		if (Dcb->UseKeepAlive)
-			DokanCheckKeepAlive(Dcb);
-	}
-
-	KeCancelTimer(&timer);
-
-	DDbgPrint("<== DokanTimeoutThread\n");
-
-	PsTerminateSystemThread(STATUS_SUCCESS);
-}
-
-
-NTSTATUS
-DokanStartCheckThread(
-	__in PDokanDCB	Dcb)
-/*++
-
-Routine Description:
-
-	execute DokanTimeoutThread
-
---*/
-{
-	NTSTATUS status;
-	HANDLE	thread;
-
-	DDbgPrint("==> DokanStartCheckThread\n");
-
-	status = PsCreateSystemThread(&thread, THREAD_ALL_ACCESS,
-		NULL, NULL, NULL, (PKSTART_ROUTINE)DokanTimeoutThread, Dcb);
-
-	if (!NT_SUCCESS(status)) {
-		return status;
-	}
-
-	ObReferenceObjectByHandle(thread, THREAD_ALL_ACCESS, NULL,
-		KernelMode, (PVOID*)&Dcb->TimeoutThread, NULL);
-
-	ZwClose(thread);
-
-	DDbgPrint("<== DokanStartCheckThread\n");
-
 	return STATUS_SUCCESS;
 }
 
 
+
 VOID
-DokanStopCheckThread(
-	__in PDokanDCB	Dcb)
+FuserUpdateTimeout(
+	__out PLARGE_INTEGER TickCount,
+	__in ULONG	Timeout
+	)
+{
+	KeQueryTickCount(TickCount);	
+	TickCount->QuadPart += Timeout * 1000 * 10 / KeQueryTimeIncrement();
+}
+
+
+
+
+VOID
+FuserStopCheckThread(
+	__in PFuserDCB	Dcb)
 /*++
 
 Routine Description:
 
-	exits DokanTimeoutThread
+	exits FuserTimeoutThread
 
 --*/
 {
-	DDbgPrint("==> DokanStopCheckThread\n");
+	FDbgPrint("==> FuserStopCheckThread\n");
 	
 	KeSetEvent(&Dcb->KillEvent, 0, FALSE);
 
@@ -368,26 +382,18 @@ Routine Description:
 		Dcb->TimeoutThread = NULL;
 	}
 	
-	DDbgPrint("<== DokanStopCheckThread\n");
+	FDbgPrint("<== FuserStopCheckThread\n");
 }
 
 
+
+/* TODO: unused:
 NTSTATUS
-DokanInformServiceAboutUnmount(
+FuserInformServiceAboutUnmount(
    __in PDEVICE_OBJECT	DeviceObject,
    __in PIRP			Irp)
 {
 
 	return STATUS_SUCCESS;
 }
-
-
-VOID
-DokanUpdateTimeout(
-	__out PLARGE_INTEGER TickCount,
-	__in ULONG	Timeout
-	)
-{
-	KeQueryTickCount(TickCount);
-	TickCount->QuadPart += Timeout * 1000 * 10 / KeQueryTimeIncrement();
-}
+*/

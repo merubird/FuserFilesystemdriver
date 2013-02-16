@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,10 +17,11 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+
 /*
 
 IOCTL_EVENT_START:
-DokanStartEventNotificationThread
+FuserStartEventNotificationThread
   NotificationThread
 	# PendingEvent has pending IPRs (IOCTL_EVENT_WAIT)
     # NotifyEvent has IO events (ex.IRP_MJ_READ)
@@ -35,133 +35,31 @@ DokanStartEventNotificationThread
                           &Dcb->Global->NotifyService);
 
 IOCTL_EVENT_RELEASE:
-DokanStopEventNotificationThread
+FuserStopEventNotificationThread
 
 IRP_MJ_READ:
-DokanDispatchRead
-  DokanRegisterPendingIrp
+FuserDispatchRead
+  FuserRegisterPendingIrp
     # add IRP_MJ_READ to PendingIrp list
-    DokanRegisterPendingIrpMain(PendingIrp)
+    FuserRegisterPendingIrpMain(PendingIrp)
 	# put MJ_READ event into NotifyEvent
-    DokanEventNotification(NotifyEvent, EventContext)
+    FuserEventNotification(NotifyEvent, EventContext)
 
 IOCTL_EVENT_WAIT:
-  DokanRegisterPendingIrpForEvent
+  FuserRegisterPendingIrpForEvent
     # add this irp to PendingEvent list
-    DokanRegisterPendingIrpMain(PendingEvent)
+    FuserRegisterPendingIrpMain(PendingEvent)
 
 IOCTL_EVENT_INFO:
-  DokanCompleteIrp
-    DokanCompleteRead
+  FuserCompleteIrp
+    FuserCompleteRead
 
 */
 
 
-#include "dokan.h"
 
-VOID
-SetCommonEventContext(
-	__in PDokanDCB		Dcb,
-	__in PEVENT_CONTEXT	EventContext,
-	__in PIRP			Irp,
-	__in PDokanCCB		Ccb)
-{
-	PIO_STACK_LOCATION  irpSp;
+#include "fuser.h"
 
-	irpSp = IoGetCurrentIrpStackLocation(Irp);
-
-	EventContext->MountId		= Dcb->MountId;
-	EventContext->MajorFunction = irpSp->MajorFunction;
-	EventContext->MinorFunction = irpSp->MinorFunction;
-	EventContext->Flags			= irpSp->Flags;
-	
-	if (Ccb) {
-		EventContext->FileFlags		= Ccb->Flags;
-	}
-
-	EventContext->ProcessId = IoGetRequestorProcessId(Irp);
-}
-
-
-PEVENT_CONTEXT
-AllocateEventContextRaw(
-	__in ULONG	EventContextLength
-	)
-{
-	ULONG driverContextLength;
-	PDRIVER_EVENT_CONTEXT driverEventContext;
-	PEVENT_CONTEXT eventContext;
-
-	driverContextLength = EventContextLength - sizeof(EVENT_CONTEXT) + sizeof(DRIVER_EVENT_CONTEXT);
-	driverEventContext = ExAllocatePool(driverContextLength);
-
-	if (driverEventContext == NULL) {
-		return NULL;
-	}
-
-	RtlZeroMemory(driverEventContext, driverContextLength);
-	InitializeListHead(&driverEventContext->ListEntry);
-
-	eventContext = &driverEventContext->EventContext;
-	eventContext->Length = EventContextLength;
-
-	return eventContext;
-}
-
-
-PEVENT_CONTEXT
-AllocateEventContext(
-	__in PDokanDCB	Dcb,
-	__in PIRP		Irp,
-	__in ULONG		EventContextLength,
-	__in PDokanCCB	Ccb
-	)
-{
-	PEVENT_CONTEXT eventContext;
-	eventContext = AllocateEventContextRaw(EventContextLength);
-	if (eventContext == NULL) {
-		return NULL;
-	}
-	SetCommonEventContext(Dcb, eventContext, Irp, Ccb);
-	eventContext->SerialNumber = InterlockedIncrement(&Dcb->SerialNumber);
-
-	return eventContext;
-}
-
-
-VOID
-DokanFreeEventContext(
-	__in PEVENT_CONTEXT	EventContext
-	)
-{
-	PDRIVER_EVENT_CONTEXT driverEventContext =
-		CONTAINING_RECORD(EventContext, DRIVER_EVENT_CONTEXT, EventContext);
-	ExFreePool(driverEventContext);
-}
-
-
-VOID
-DokanEventNotification(
-	__in PIRP_LIST		NotifyEvent,
-	__in PEVENT_CONTEXT	EventContext
-	)
-{
-	PDRIVER_EVENT_CONTEXT driverEventContext =
-		CONTAINING_RECORD(EventContext, DRIVER_EVENT_CONTEXT, EventContext);
-
-	InitializeListHead(&driverEventContext->ListEntry);
-
-	ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL);
-
-	//DDbgPrint("DokanEventNotification\n");
-
-	ExInterlockedInsertTailList(
-		&NotifyEvent->ListHead,
-		&driverEventContext->ListEntry,
-		&NotifyEvent->ListLock);
-
-	KeSetEvent(&NotifyEvent->NotEmpty, IO_NO_INCREMENT, FALSE);
-}
 
 
 VOID
@@ -184,10 +82,11 @@ ReleasePendingIrp(
 		listHead = RemoveHeadList(&PendingIrp->ListHead);
 		irpEntry = CONTAINING_RECORD(listHead, IRP_ENTRY, ListEntry);
 		irp = irpEntry->Irp;
+
 		if (irp == NULL) {
 			// this IRP has already been canceled
 			ASSERT(irpEntry->CancelRoutineFreeMemory == FALSE);
-			DokanFreeIrpEntry(irpEntry);
+			FuserFreeIrpEntry(irpEntry);
 			continue;
 		}
 
@@ -198,6 +97,7 @@ ReleasePendingIrp(
 			continue;
 		}
 		InsertTailList(&completeList, &irpEntry->ListEntry);
+
 	}
 
 	KeClearEvent(&PendingIrp->NotEmpty);
@@ -209,33 +109,10 @@ ReleasePendingIrp(
 		irp = irpEntry->Irp;
 		irp->IoStatus.Information = 0;
 		irp->IoStatus.Status = STATUS_SUCCESS;
-		DokanFreeIrpEntry(irpEntry);
+		FuserFreeIrpEntry(irpEntry);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
-}
-
-
-VOID
-ReleaseNotifyEvent(
-	__in PIRP_LIST	NotifyEvent
-	)
-{
-	PDRIVER_EVENT_CONTEXT	driverEventContext;
-	PLIST_ENTRY	listHead;
-	KIRQL oldIrql;
-
-	ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL);
-	KeAcquireSpinLock(&NotifyEvent->ListLock, &oldIrql);
-
-	while(!IsListEmpty(&NotifyEvent->ListHead)) {
-		listHead = RemoveHeadList(&NotifyEvent->ListHead);
-		driverEventContext = CONTAINING_RECORD(
-			listHead, DRIVER_EVENT_CONTEXT, ListEntry);
-		ExFreePool(driverEventContext);
-	}
-
-	KeClearEvent(&NotifyEvent->NotEmpty);
-	KeReleaseSpinLock(&NotifyEvent->ListLock, oldIrql);
+	
 }
 
 
@@ -257,7 +134,7 @@ NotificationLoop(
 	ULONG	bufferLen;
 	PVOID	buffer;
 
-	//DDbgPrint("=> NotificationLoop\n");
+	//FDbgPrint("=> NotificationLoop\n");
 
 	InitializeListHead(&completeList);
 
@@ -267,7 +144,6 @@ NotificationLoop(
 		
 	while (!IsListEmpty(&PendingIrp->ListHead) &&
 		!IsListEmpty(&NotifyEvent->ListHead)) {
-			
 		listHead = RemoveHeadList(&NotifyEvent->ListHead);
 
 		driverEventContext = CONTAINING_RECORD(
@@ -284,7 +160,7 @@ NotificationLoop(
 		if (irp == NULL) {
 			// this IRP has already been canceled
 			ASSERT(irpEntry->CancelRoutineFreeMemory == FALSE);
-			DokanFreeIrpEntry(irpEntry);
+			FuserFreeIrpEntry(irpEntry);
 			// push back
 			InsertTailList(&NotifyEvent->ListHead,
 							&driverEventContext->ListEntry);
@@ -309,8 +185,8 @@ NotificationLoop(
 
 		// buffer is not specified or short of length
 		if (bufferLen == 0 || buffer == NULL || bufferLen < eventLen) {
-			DDbgPrint("EventNotice : STATUS_INSUFFICIENT_RESOURCES\n");
-			DDbgPrint("  bufferLen: %d, eventLen: %d\n", bufferLen, eventLen);
+			FDbgPrint("EventNotice : STATUS_INSUFFICIENT_RESOURCES\n");
+			FDbgPrint("  bufferLen: %d, eventLen: %d\n", bufferLen, eventLen);
 			// push back
 			InsertTailList(&NotifyEvent->ListHead,
 							&driverEventContext->ListEntry);
@@ -347,29 +223,32 @@ NotificationLoop(
 			irp->IoStatus.Information = irpEntry->SerialNumber;
 			irp->IoStatus.Status = STATUS_SUCCESS;
 		}
-		DokanFreeIrpEntry(irpEntry);
+		FuserFreeIrpEntry(irpEntry);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 
-	//DDbgPrint("<= NotificationLoop\n");
+	//FDbgPrint("<= NotificationLoop\n");
 }
+
+
+
 
 
 KSTART_ROUTINE NotificationThread;
 VOID
 NotificationThread(
-	__in PDokanDCB	Dcb
+	__in PFuserDCB	Dcb
 	)
 {
 	PKEVENT events[5];
 	PKWAIT_BLOCK waitBlock;
 	NTSTATUS status;
 
-	DDbgPrint("==> NotificationThread\n");
+	FDbgPrint("==> NotificationThread\n");
 
 	waitBlock = ExAllocatePool(sizeof(KWAIT_BLOCK) * 5);
 	if (waitBlock == NULL) {
-		DDbgPrint("  Can't allocate WAIT_BLOCK\n");
+		FDbgPrint("  Can't allocate WAIT_BLOCK\n");
 		return;
 	}
 	events[0] = &Dcb->ReleaseEvent;
@@ -400,19 +279,19 @@ NotificationThread(
 	}
 
 	ExFreePool(waitBlock);
-	DDbgPrint("<== NotificationThread\n");
+	FDbgPrint("<== NotificationThread\n");	
 }
 
 
 
 NTSTATUS
-DokanStartEventNotificationThread(
-	__in PDokanDCB	Dcb)
+FuserStartEventNotificationThread(
+	__in PFuserDCB	Dcb)
 {
 	NTSTATUS status;
 	HANDLE	thread;
 
-	DDbgPrint("==> DokanStartEventNotificationThread\n");
+	FDbgPrint("==> FuserStartEventNotificationThread\n");
 
 	KeResetEvent(&Dcb->ReleaseEvent);
 
@@ -430,40 +309,132 @@ DokanStartEventNotificationThread(
 
 	ZwClose(thread);
 
-	DDbgPrint("<== DokanStartEventNotificationThread\n");
+	FDbgPrint("<== FuserStartEventNotificationThread\n");
 
-	return STATUS_SUCCESS;
+	return STATUS_SUCCESS;	
 }
+
 
 
 VOID
-DokanStopEventNotificationThread(
-	__in PDokanDCB	Dcb)
+FuserFreeEventContext(
+	__in PEVENT_CONTEXT	EventContext
+	)
 {
-	DDbgPrint("==> DokanStopEventNotificationThread\n");
-	
-	KeSetEvent(&Dcb->ReleaseEvent, 0, FALSE);
-
-	if (Dcb->EventNotificationThread) {
-		KeWaitForSingleObject(
-			Dcb->EventNotificationThread, Executive,
-			KernelMode, FALSE, NULL);
-		ObDereferenceObject(Dcb->EventNotificationThread);
-		Dcb->EventNotificationThread = NULL;
-	}
-	
-	DDbgPrint("<== DokanStopEventNotificationThread\n");
+	PDRIVER_EVENT_CONTEXT driverEventContext =
+		CONTAINING_RECORD(EventContext, DRIVER_EVENT_CONTEXT, EventContext);
+	ExFreePool(driverEventContext);
 }
 
 
+
+VOID
+SetCommonEventContext(
+	__in PFuserDCB		Dcb,
+	__in PEVENT_CONTEXT	EventContext,
+	__in PIRP			Irp,
+	__in PFuserCCB		Ccb)
+{
+	PIO_STACK_LOCATION  irpSp;
+
+	irpSp = IoGetCurrentIrpStackLocation(Irp);
+
+	EventContext->MountId		= Dcb->MountId;
+	EventContext->MajorFunction = irpSp->MajorFunction;
+	EventContext->MinorFunction = irpSp->MinorFunction;
+	EventContext->Flags			= irpSp->Flags;
+	
+	if (Ccb) {
+		EventContext->FileFlags		= Ccb->Flags;
+	}
+
+	EventContext->ProcessId = IoGetRequestorProcessId(Irp);
+}
+
+
+PEVENT_CONTEXT
+AllocateEventContext(
+	__in PFuserDCB	Dcb,
+	__in PIRP		Irp,
+	__in ULONG		EventContextLength,
+	__in PFuserCCB	Ccb
+	)
+{
+	PEVENT_CONTEXT eventContext;
+	eventContext = AllocateEventContextRaw(EventContextLength);
+	if (eventContext == NULL) {
+		return NULL;
+	}
+	SetCommonEventContext(Dcb, eventContext, Irp, Ccb);
+	eventContext->SerialNumber = InterlockedIncrement(&Dcb->SerialNumber);
+
+	return eventContext;
+}
+
+
+
+
+
+PEVENT_CONTEXT
+AllocateEventContextRaw(
+	__in ULONG	EventContextLength
+	)
+{
+	ULONG driverContextLength;
+	PDRIVER_EVENT_CONTEXT driverEventContext;
+	PEVENT_CONTEXT eventContext;
+
+	driverContextLength = EventContextLength - sizeof(EVENT_CONTEXT) + sizeof(DRIVER_EVENT_CONTEXT);
+	driverEventContext = ExAllocatePool(driverContextLength);
+
+	if (driverEventContext == NULL) {
+		return NULL;
+	}
+
+	RtlZeroMemory(driverEventContext, driverContextLength);
+	InitializeListHead(&driverEventContext->ListEntry);
+
+	eventContext = &driverEventContext->EventContext;
+	eventContext->Length = EventContextLength;
+
+	return eventContext;
+}
+
+
+
+VOID
+FuserEventNotification(
+	__in PIRP_LIST		NotifyEvent,
+	__in PEVENT_CONTEXT	EventContext
+	)
+{
+	PDRIVER_EVENT_CONTEXT driverEventContext =
+		CONTAINING_RECORD(EventContext, DRIVER_EVENT_CONTEXT, EventContext);
+
+	InitializeListHead(&driverEventContext->ListEntry);
+
+	ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL);
+
+	//FDbgPrint("FuserEventNotification\n");
+
+	ExInterlockedInsertTailList(
+		&NotifyEvent->ListHead,
+		&driverEventContext->ListEntry,
+		&NotifyEvent->ListLock);
+
+	KeSetEvent(&NotifyEvent->NotEmpty, IO_NO_INCREMENT, FALSE);
+}
+
+
+
 NTSTATUS
-DokanEventRelease(
+FuserEventRelease(
 	__in PDEVICE_OBJECT DeviceObject)
 {
-	PDokanDCB	dcb;
-	PDokanVCB	vcb;
-	PDokanFCB	fcb;
-	PDokanCCB	ccb;
+	PFuserDCB	dcb;
+	PFuserVCB	vcb;
+	PFuserFCB	fcb;
+	PFuserCCB	ccb;
 	PLIST_ENTRY	fcbEntry, fcbNext, fcbHead;
 	PLIST_ENTRY	ccbEntry, ccbNext, ccbHead;
 	NTSTATUS	status = STATUS_SUCCESS;
@@ -488,7 +459,7 @@ DokanEventRelease(
     for (fcbEntry = fcbHead->Flink; fcbEntry != fcbHead; fcbEntry = fcbNext) {
 
 		fcbNext = fcbEntry->Flink;
-		fcb = CONTAINING_RECORD(fcbEntry, DokanFCB, NextFCB);
+		fcb = CONTAINING_RECORD(fcbEntry, FuserFCB, NextFCB);
 
 		ExAcquireResourceExclusiveLite(&fcb->Resource, TRUE);
 
@@ -496,9 +467,9 @@ DokanEventRelease(
 
 		for (ccbEntry = ccbHead->Flink; ccbEntry != ccbHead; ccbEntry = ccbNext) {
 			ccbNext = ccbEntry->Flink;
-			ccb = CONTAINING_RECORD(ccbEntry, DokanCCB, NextCCB);
+			ccb = CONTAINING_RECORD(ccbEntry, FuserCCB, NextCCB);
 
-			DDbgPrint("  NotifyCleanup ccb:%X, context:%X, filename:%wZ\n",
+			FDbgPrint("  NotifyCleanup ccb:%X, context:%X, filename:%wZ\n",
 					ccb, (ULONG)ccb->UserContext, &fcb->FileName);
 			FsRtlNotifyCleanup(vcb->NotifySync, &vcb->DirNotifyList, ccb);
 		}
@@ -508,12 +479,61 @@ DokanEventRelease(
 	ExReleaseResourceLite(&vcb->Resource);
 	KeLeaveCriticalRegion();
 
+	// All open activities are stopped here
 	ReleasePendingIrp(&dcb->PendingIrp);
 	ReleasePendingIrp(&dcb->PendingEvent);
-	DokanStopCheckThread(dcb);
-	DokanStopEventNotificationThread(dcb);
-
-	DokanDeleteDeviceObject(dcb);
-
+	FuserStopCheckThread(dcb);
+	FuserStopEventNotificationThread(dcb);
+	FuserDeleteDeviceObject(dcb);
+	
 	return status;
 }
+
+
+
+
+VOID
+FuserStopEventNotificationThread(
+	__in PFuserDCB	Dcb)
+{
+	FDbgPrint("==> FuserStopEventNotificationThread\n");
+	
+	KeSetEvent(&Dcb->ReleaseEvent, 0, FALSE);
+
+	if (Dcb->EventNotificationThread) {
+		KeWaitForSingleObject(
+			Dcb->EventNotificationThread, Executive,
+			KernelMode, FALSE, NULL);
+		ObDereferenceObject(Dcb->EventNotificationThread);
+		Dcb->EventNotificationThread = NULL;
+	}
+	
+	FDbgPrint("<== FuserStopEventNotificationThread\n");
+}
+
+
+
+/* Obsolete method, no longer needed.
+VOID
+ReleaseNotifyEvent(
+	__in PIRP_LIST	NotifyEvent
+	)
+{
+	PDRIVER_EVENT_CONTEXT	driverEventContext;
+	PLIST_ENTRY	listHead;
+	KIRQL oldIrql;
+
+	ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL);
+	KeAcquireSpinLock(&NotifyEvent->ListLock, &oldIrql);
+
+	while(!IsListEmpty(&NotifyEvent->ListHead)) {
+		listHead = RemoveHeadList(&NotifyEvent->ListHead);
+		driverEventContext = CONTAINING_RECORD(
+			listHead, DRIVER_EVENT_CONTEXT, ListEntry);
+		ExFreePool(driverEventContext);
+	}
+
+	KeClearEvent(&NotifyEvent->NotEmpty);
+	KeReleaseSpinLock(&NotifyEvent->ListLock, oldIrql);
+}
+*/

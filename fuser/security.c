@@ -1,9 +1,8 @@
 /*
   Dokan : user-mode file system library for Windows
 
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
   Copyright (C) 2010 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,18 +17,18 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 
 VOID
 DispatchQuerySecurity(
 	HANDLE			Handle,
 	PEVENT_CONTEXT	EventContext,
-	PDOKAN_INSTANCE	DokanInstance)
+	PFUSER_INSTANCE	FuserInstance)
 {
 	PEVENT_INFORMATION	eventInfo;
-	DOKAN_FILE_INFO		fileInfo;
-	PDOKAN_OPEN_INFO	openInfo;
+	FUSER_FILE_INFO		fileInfo;
+	PFUSER_OPEN_INFO	openInfo;
 	ULONG	eventInfoLength;
 	ULONG	securityDescLength;
 	int		status = -ERROR_CALL_NOT_IMPLEMENTED;
@@ -38,12 +37,13 @@ DispatchQuerySecurity(
 	eventInfoLength = sizeof(EVENT_INFORMATION) - 8 + EventContext->Security.BufferLength;
 	CheckFileName(EventContext->Security.FileName);
 
-	eventInfo = DispatchCommon(EventContext, eventInfoLength, DokanInstance, &fileInfo, &openInfo);
+	eventInfo = DispatchCommon(EventContext, eventInfoLength, FuserInstance, &fileInfo, &openInfo);
 	
 
-	if (DOKAN_SECURITY_SUPPORTED_VERSION <= DokanInstance->DokanOptions->Version &&
-		DokanInstance->DokanOperations->GetFileSecurity) {
-		status = DokanInstance->DokanOperations->GetFileSecurity(
+	// TODO: remove the stuff with the version
+	if (FUSER_SECURITY_SUPPORTED_VERSION <= FuserInstance->FuserOptions->Version &&
+		FuserInstance->FuserOperations->GetFileSecurity) {
+		status = FuserInstance->FuserOperations->GetFileSecurity(
 					EventContext->Security.FileName,
 					&EventContext->Security.SecurityInformation,
 					&eventInfo->Buffer,
@@ -78,7 +78,7 @@ DispatchQuerySecurity(
 		}
 	}
 
-	SendEventInformation(Handle, eventInfo, eventInfoLength, DokanInstance);
+	SendEventInformation(Handle, eventInfo, eventInfoLength, FuserInstance);
 	free(eventInfo);
 }
 
@@ -87,11 +87,11 @@ VOID
 DispatchSetSecurity(
 	HANDLE			Handle,
 	PEVENT_CONTEXT	EventContext,
-	PDOKAN_INSTANCE	DokanInstance)
+	PFUSER_INSTANCE	FuserInstance)
 {
 	PEVENT_INFORMATION	eventInfo;
-	DOKAN_FILE_INFO		fileInfo;
-	PDOKAN_OPEN_INFO	openInfo;
+	FUSER_FILE_INFO		fileInfo;
+	PFUSER_OPEN_INFO	openInfo;
 	ULONG	eventInfoLength;
 	int		status = -1;
 	PSECURITY_DESCRIPTOR	securityDescriptor;
@@ -99,13 +99,14 @@ DispatchSetSecurity(
 	eventInfoLength = sizeof(EVENT_INFORMATION);
 	CheckFileName(EventContext->SetSecurity.FileName);
 
-	eventInfo = DispatchCommon(EventContext, eventInfoLength, DokanInstance, &fileInfo, &openInfo);
+	eventInfo = DispatchCommon(EventContext, eventInfoLength, FuserInstance, &fileInfo, &openInfo);
 	
 	securityDescriptor = (PCHAR)EventContext + EventContext->SetSecurity.BufferOffset;
 
-	if (DOKAN_SECURITY_SUPPORTED_VERSION <= DokanInstance->DokanOptions->Version &&
-		DokanInstance->DokanOperations->SetFileSecurity) {
-		status = DokanInstance->DokanOperations->SetFileSecurity(
+	// TODO: remove the stuff with the version
+	if (FUSER_SECURITY_SUPPORTED_VERSION <= FuserInstance->FuserOptions->Version &&
+		FuserInstance->FuserOperations->SetFileSecurity) {
+		status = FuserInstance->FuserOperations->SetFileSecurity(
 					EventContext->SetSecurity.FileName,
 					&EventContext->SetSecurity.SecurityInformation,
 					securityDescriptor,
@@ -121,7 +122,7 @@ DispatchSetSecurity(
 		eventInfo->BufferLength = 0;
 	}
 
-	SendEventInformation(Handle, eventInfo, eventInfoLength, DokanInstance);
+	SendEventInformation(Handle, eventInfo, eventInfoLength, FuserInstance);
 	free(eventInfo);
 }
 

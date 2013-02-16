@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,7 +18,8 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokani.h"
+
+#include "fuseri.h"
 #include "fileinfo.h"
 
 
@@ -27,37 +27,37 @@ VOID
 DispatchCreate(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance)
+	PFUSER_INSTANCE		FuserInstance)
 {
 	static eventId = 0;
 	ULONG					length	  = sizeof(EVENT_INFORMATION);
 	PEVENT_INFORMATION		eventInfo = (PEVENT_INFORMATION)malloc(length);
 	int						status;
-	DOKAN_FILE_INFO			fileInfo;
+	FUSER_FILE_INFO			fileInfo;
 	DWORD					disposition;
-	PDOKAN_OPEN_INFO		openInfo;
+	PFUSER_OPEN_INFO		openInfo;
 	BOOL					directoryRequested = FALSE;
 	DWORD					options;
 
 	CheckFileName(EventContext->Create.FileName);
 
 	RtlZeroMemory(eventInfo, length);
-	RtlZeroMemory(&fileInfo, sizeof(DOKAN_FILE_INFO));
+	RtlZeroMemory(&fileInfo, sizeof(FUSER_FILE_INFO));
 
 	eventInfo->BufferLength = 0;
 	eventInfo->SerialNumber = EventContext->SerialNumber;
 
 	fileInfo.ProcessId = EventContext->ProcessId;
-	fileInfo.DokanOptions = DokanInstance->DokanOptions;
+	fileInfo.FuserOptions = FuserInstance->FuserOptions;
 
-	// DOKAN_OPEN_INFO is structure for a opened file
+	// FUSER_OPEN_INFO is structure for a opened file
 	// this will be freed by Close
-	openInfo = malloc(sizeof(DOKAN_OPEN_INFO));
-	ZeroMemory(openInfo, sizeof(DOKAN_OPEN_INFO));
+	openInfo = malloc(sizeof(FUSER_OPEN_INFO));
+	ZeroMemory(openInfo, sizeof(FUSER_OPEN_INFO));
 	openInfo->OpenCount = 2;
 	openInfo->EventContext = EventContext;
-	openInfo->DokanInstance = DokanInstance;
-	fileInfo.DokanContext = (ULONG64)openInfo;
+	openInfo->FuserInstance = FuserInstance;
+	fileInfo.FuserContext = (ULONG64)openInfo;
 
 	// pass it to driver and when the same handle is used get it back
 	eventInfo->Context = (ULONG64)openInfo;
@@ -99,14 +99,14 @@ DispatchCreate(
 		fileInfo.IsDirectory = TRUE;
 
 		if (disposition == FILE_CREATE || disposition == FILE_OPEN_IF) {
-			if (DokanInstance->DokanOperations->CreateDirectory) {
-				status = DokanInstance->DokanOperations->CreateDirectory(
-							EventContext->Create.FileName, &fileInfo);
+			if (FuserInstance->FuserOperations->CreateDirectory) {
+				status = FuserInstance->FuserOperations->CreateDirectory(
+							EventContext->Create.FileName, &fileInfo); // TODO: Pass on all parameters
 			}
 		} else if(disposition == FILE_OPEN) {
-			if (DokanInstance->DokanOperations->OpenDirectory) {
-				status = DokanInstance->DokanOperations->OpenDirectory(
-							EventContext->Create.FileName, &fileInfo);
+			if (FuserInstance->FuserOperations->OpenDirectory) {
+				status = FuserInstance->FuserOperations->OpenDirectory(
+							EventContext->Create.FileName, &fileInfo); // TODO: Pass on all parameters
 			}
 		} else {
 			DbgPrint("### Create other disposition : %d\n", disposition);
@@ -134,13 +134,13 @@ DispatchCreate(
 				creationDisposition = CREATE_ALWAYS;
 				break;
 			default:
-				// TODO: should support FILE_SUPERSEDE ?
+				// TODO: should support FILE_SUPERSEDE ? TODO: Recheck this
 				DbgPrint("### Create other disposition : %d\n", disposition);
 				break;
 		}
 		
-		if(DokanInstance->DokanOperations->CreateFile) {
-			status = DokanInstance->DokanOperations->CreateFile(
+		if(FuserInstance->FuserOperations->CreateFile) {
+			status = FuserInstance->FuserOperations->CreateFile(
 									EventContext->Create.FileName,
 									EventContext->Create.DesiredAccess,
 									EventContext->Create.ShareAccess,
@@ -150,7 +150,7 @@ DispatchCreate(
 		}
 	}
 
-	// save the information about this access in DOKAN_OPEN_INFO
+	// save the information about this access in FUSER_OPEN_INFO
 	openInfo->IsDirectory = fileInfo.IsDirectory;
 	openInfo->UserContext = fileInfo.Context;
 
@@ -163,7 +163,7 @@ DispatchCreate(
 
 
 	if (status < 0) {
-
+		// TODO: Support error codes
 		int error = status * -1;
 		
 		DbgPrint("CreateFile status = %d\n", status);
@@ -216,7 +216,6 @@ DispatchCreate(
 			free(openInfo);
 			eventInfo->Context = 0;
 		}
-
 	} else {
 		
 		//DbgPrint("status = %d\n", status);
@@ -240,10 +239,12 @@ DispatchCreate(
 		}
 
 		if (fileInfo.IsDirectory)
-			eventInfo->Create.Flags |= DOKAN_FILE_DIRECTORY;
+			eventInfo->Create.Flags |= FUSER_FILE_DIRECTORY;
 	}
 	
-	SendEventInformation(Handle, eventInfo, length, DokanInstance);
+	SendEventInformation(Handle, eventInfo, length, FuserInstance);
 	free(eventInfo);
 	return;
 }
+
+

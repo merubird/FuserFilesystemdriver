@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,9 +17,7 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 #include <winioctl.h>
 
@@ -60,18 +57,18 @@ VOID
 DispatchWrite(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance)
+	PFUSER_INSTANCE		FuserInstance)
 {
 	PEVENT_INFORMATION		eventInfo;
-	PDOKAN_OPEN_INFO		openInfo;
+	PFUSER_OPEN_INFO		openInfo;
 	ULONG					writtenLength = 0;
 	int						status;
-	DOKAN_FILE_INFO			fileInfo;
+	FUSER_FILE_INFO			fileInfo;
 	BOOL					bufferAllocated = FALSE;
 	ULONG					sizeOfEventInfo = sizeof(EVENT_INFORMATION);
 
 	eventInfo = DispatchCommon(
-		EventContext, sizeOfEventInfo, DokanInstance, &fileInfo, &openInfo);
+		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
 	// Since driver requested bigger memory,
 	// allocate enough memory and send it to driver
@@ -87,8 +84,8 @@ DispatchWrite(
 
 	DbgPrint("###WriteFile %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
-	if (DokanInstance->DokanOperations->WriteFile) {
-		status = DokanInstance->DokanOperations->WriteFile(
+	if (FuserInstance->FuserOperations->WriteFile) {
+		status = FuserInstance->FuserOperations->WriteFile(
 						EventContext->Write.FileName,
 						(PCHAR)EventContext + EventContext->Write.BufferOffset,
 						EventContext->Write.BufferLength,
@@ -103,6 +100,7 @@ DispatchWrite(
 	eventInfo->BufferLength = 0;
 
 	if (status < 0) {
+		// TODO: support numerous other errors!!! also filelock errors
 		eventInfo->Status = STATUS_INVALID_PARAMETER;
 	
 	} else {
@@ -112,7 +110,7 @@ DispatchWrite(
 			EventContext->Write.ByteOffset.QuadPart + writtenLength;
 	}
 
-	SendEventInformation(Handle, eventInfo, sizeOfEventInfo, DokanInstance);
+	SendEventInformation(Handle, eventInfo, sizeOfEventInfo, FuserInstance);
 	free(eventInfo);
 
 	if (bufferAllocated)

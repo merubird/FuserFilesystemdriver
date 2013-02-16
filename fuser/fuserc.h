@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,63 +17,66 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef _FUSERC_H_
+#define _FUSERC_H_
 
-#ifndef _DOKANC_H_
-#define _DOKANC_H_
-
-#include "dokan.h"
+#include "fuser.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define DOKAN_MOUNT_POINT_SUPPORTED_VERSION 600
-#define DOKAN_SECURITY_SUPPORTED_VERSION	600
 
-#define DOKAN_GLOBAL_DEVICE_NAME	L"\\\\.\\Dokan"
-#define DOKAN_CONTROL_PIPE			L"\\\\.\\pipe\\DokanMounter"
 
-#define DOKAN_MOUNTER_SERVICE L"DokanMounter"
-#define DOKAN_DRIVER_SERVICE L"Dokan"
+// TODO: Remove these codes
+/*
+#define FUSER_MOUNTER_SERVICE L"FuserMounter"
+#define FUSER_DRIVER_SERVICE L"Fuser"
+#define FUSER_CONTROL_CHECK		3
+#define FUSER_CONTROL_FIND		4
+#define FUSER_CONTROL_LIST		5
+#define FUSER_CONTROL_OPTION_FORCE_UNMOUNT 1
+#define FUSER_CONTROL_SUCCESS	1
+*/
 
-#define DOKAN_CONTROL_MOUNT		1
-#define DOKAN_CONTROL_UNMOUNT	2
-#define DOKAN_CONTROL_CHECK		3
-#define DOKAN_CONTROL_FIND		4
-#define DOKAN_CONTROL_LIST		5
 
-#define DOKAN_CONTROL_OPTION_FORCE_UNMOUNT 1
 
-#define DOKAN_CONTROL_SUCCESS	1
-#define DOKAN_CONTROL_FAIL		0
+#define FUSER_MOUNT_POINT_SUPPORTED_VERSION 600 // TODO: Remove this
+#define FUSER_SECURITY_SUPPORTED_VERSION	600 // TODO: Remove this
 
-#define DOKAN_SERVICE_START		1
-#define DOKAN_SERVICE_STOP		2
-#define DOKAN_SERVICE_DELETE	3
 
-#define DOKAN_KEEPALIVE_TIME	3000 // in miliseconds
+#define FUSER_GLOBAL_DEVICE_NAME	L"\\\\.\\Fuser" // TODO: adapt at the opportunity
+#define FUSER_CONTROL_PIPE			L"\\\\.\\pipe\\FuserMounter"
 
-#define DOKAN_MAX_THREAD		15
 
-// DokanOptions->DebugMode is ON?
+#define FUSER_MAX_THREAD		15
+
+
+#define FUSER_CONTROL_MOUNT		1
+#define FUSER_CONTROL_UNMOUNT	2
+
+
+#define FUSER_CONTROL_FAIL		0
+
+
+#define FUSER_SERVICE_START		1
+#define FUSER_SERVICE_STOP		2
+#define FUSER_SERVICE_DELETE	3
+
+#define FUSER_KEEPALIVE_TIME	3000 // in miliseconds       // TODO: should be moved to .NET class
+
+
+// FuserOptions->DebugMode is ON?
 extern	BOOL	g_DebugMode;
 
-// DokanOptions->UseStdErr is ON?
+// FuserOptions->UseStdErr is ON?
 extern	BOOL	g_UseStdErr;
 
-typedef struct _DOKAN_CONTROL {
-	ULONG	Type;
-	WCHAR	MountPoint[MAX_PATH];
-	WCHAR	DeviceName[64];
-	ULONG	Option;
-	ULONG	Status;
-
-} DOKAN_CONTROL, *PDOKAN_CONTROL;
 
 
 static
 VOID
-DokanDbgPrint(LPCSTR format, ...)
+FuserDbgPrint(LPCSTR format, ...)
 {
 	char buffer[512];
 	va_list argp;
@@ -89,7 +91,7 @@ DokanDbgPrint(LPCSTR format, ...)
 
 static
 VOID
-DokanDbgPrintW(LPCWSTR format, ...)
+FuserDbgPrintW(LPCWSTR format, ...)
 {
 	WCHAR buffer[512];
 	va_list argp;
@@ -106,44 +108,71 @@ DokanDbgPrintW(LPCWSTR format, ...)
 #define DbgPrint(format, ... ) \
 	do {\
 		if (g_DebugMode) {\
-			DokanDbgPrint(format, __VA_ARGS__);\
+			FuserDbgPrint(format, __VA_ARGS__);\
 		}\
 	} while(0)
 
 #define DbgPrintW(format, ... ) \
 	do {\
 		if (g_DebugMode) {\
-			DokanDbgPrintW(format, __VA_ARGS__);\
+			FuserDbgPrintW(format, __VA_ARGS__);\
 		}\
 	} while(0)
+	
+	
+	
+	
 
 
-BOOL DOKANAPI
-DokanServiceInstall(
+typedef struct _FUSER_CONTROL {
+	ULONG	Type;
+	WCHAR	MountPoint[MAX_PATH];
+	WCHAR	DeviceName[64];
+	ULONG	Option;
+	ULONG	Status;
+
+} FUSER_CONTROL, *PFUSER_CONTROL;
+
+
+
+BOOL FUSERAPI
+FuserMountControl(PFUSER_CONTROL Control);
+
+
+BOOL FUSERAPI
+FuserServiceInstall(
 	LPCWSTR	ServiceName,
 	DWORD	ServiceType,
 	LPCWSTR ServiceFullPath);
 
-BOOL DOKANAPI
-DokanServiceDelete(
+
+BOOL FUSERAPI
+FuserServiceDelete(
 	LPCWSTR	ServiceName);
 
-BOOL DOKANAPI
-DokanNetworkProviderInstall();
 
-BOOL DOKANAPI
-DokanNetworkProviderUninstall();
 
-BOOL DOKANAPI
-DokanSetDebugMode(ULONG Mode);
 
-BOOL DOKANAPI
-DokanMountControl(PDOKAN_CONTROL Control);
+BOOL FUSERAPI
+FuserNetworkProviderInstall(); // TODO: remove method
 
+
+
+BOOL FUSERAPI
+FuserNetworkProviderUninstall();	// TODO: remove method
+
+
+
+BOOL FUSERAPI
+FuserSetDebugMode(ULONG Mode);
+
+
+	
 
 #ifdef __cplusplus
 }
 #endif
+
 
 
 #endif

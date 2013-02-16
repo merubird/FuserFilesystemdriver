@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,30 +18,39 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokan.h"
 
+#include "fuser.h"
 
 #ifdef ALLOC_PRAGMA
 #pragma alloc_text (INIT, DriverEntry)
-#pragma alloc_text (PAGE, DokanUnload)
-#pragma alloc_text (PAGE, DokanDispatchShutdown)
-#pragma alloc_text (PAGE, DokanDispatchPnp)
+#pragma alloc_text (PAGE, FuserUnload)
+#pragma alloc_text (PAGE, FuserDispatchShutdown)
+#pragma alloc_text (PAGE, FuserDispatchPnp)
 #endif
 
 
-ULONG g_Debug = DOKAN_DEBUG_DEFAULT;
+
+UNICODE_STRING				FcbFileNameNull;
+ULONG 						g_Debug = FUSER_DEBUG_DEFAULT;
+
+NPAGED_LOOKASIDE_LIST		FuserIrpEntryLookasideList;
+FAST_IO_CHECK_IF_POSSIBLE 	FuserFastIoCheckIfPossible;
+FAST_IO_ACQUIRE_FILE 		FuserAcquireForCreateSection;
+FAST_IO_RELEASE_FILE 		FuserReleaseForCreateSection;
+
 
 #if _WIN32_WINNT < 0x0501
-	PFN_FSRTLTEARDOWNPERSTREAMCONTEXTS DokanFsRtlTeardownPerStreamContexts;
+	PFN_FSRTLTEARDOWNPERSTREAMCONTEXTS FuserFsRtlTeardownPerStreamContexts;
 #endif
 
-NPAGED_LOOKASIDE_LIST	DokanIrpEntryLookasideList;
-UNICODE_STRING			FcbFileNameNull;
+// TODO: revise
 
-FAST_IO_CHECK_IF_POSSIBLE DokanFastIoCheckIfPossible;
+
+
+
 
 BOOLEAN
-DokanFastIoCheckIfPossible (
+FuserFastIoCheckIfPossible (
     __in PFILE_OBJECT	FileObject,
     __in PLARGE_INTEGER	FileOffset,
     __in ULONG			Length,
@@ -53,30 +61,14 @@ DokanFastIoCheckIfPossible (
     __in PDEVICE_OBJECT		DeviceObject
     )
 {
-	DDbgPrint("DokanFastIoCheckIfPossible\n");
+	FDbgPrint("FuserFastIoCheckIfPossible\n");
 	return FALSE;
 }
 
 
-BOOLEAN
-DokanFastIoRead (
-    __in PFILE_OBJECT	FileObject,
-    __in PLARGE_INTEGER	FileOffset,
-    __in ULONG			Length,
-    __in BOOLEAN		Wait,
-    __in ULONG			LockKey,
-    __in PVOID			Buffer,
-    __out PIO_STATUS_BLOCK	IoStatus,
-    __in PDEVICE_OBJECT		DeviceObject
-    )
-{
-	DDbgPrint("DokanFastIoRead\n");
-	return FALSE;
-}
 
-FAST_IO_ACQUIRE_FILE DokanAcquireForCreateSection;
 VOID
-DokanAcquireForCreateSection(
+FuserAcquireForCreateSection(
 	__in PFILE_OBJECT FileObject
 	)
 {
@@ -87,33 +79,19 @@ DokanAcquireForCreateSection(
 		ExAcquireResourceExclusiveLite(header->Resource, TRUE);
 	}
 
-	DDbgPrint("DokanAcquireForCreateSection\n");
+	FDbgPrint("FuserAcquireForCreateSection\n");
 }
 
-FAST_IO_RELEASE_FILE DokanReleaseForCreateSection;
-VOID
-DokanReleaseForCreateSection(
-   __in PFILE_OBJECT FileObject
-	)
-{
-	PFSRTL_ADVANCED_FCB_HEADER	header;
 
-	header = FileObject->FsContext;
-	if (header && header->Resource) {
-		ExReleaseResourceLite(header->Resource);
-	}
-
-	DDbgPrint("DokanReleaseForCreateSection\n");
-}
 
 NTSTATUS
-DokanFilterCallbackAcquireForCreateSection(
+FuserFilterCallbackAcquireForCreateSection(
 	__in PFS_FILTER_CALLBACK_DATA CallbackData,
     __out PVOID *CompletionContext
 	)
 {
 	PFSRTL_ADVANCED_FCB_HEADER	header;
-	DDbgPrint("DokanFilterCallbackAcquireForCreateSection\n");
+	FDbgPrint("FuserFilterCallbackAcquireForCreateSection\n");
 
 	header = CallbackData->FileObject->FsContext;
 
@@ -129,127 +107,125 @@ DokanFilterCallbackAcquireForCreateSection(
 	}
 }
 
+
+VOID
+FuserReleaseForCreateSection(
+   __in PFILE_OBJECT FileObject
+	)
+{
+	PFSRTL_ADVANCED_FCB_HEADER	header;
+
+	header = FileObject->FsContext;
+	if (header && header->Resource) {
+		ExReleaseResourceLite(header->Resource);
+	}
+
+	FDbgPrint("FuserReleaseForCreateSection\n");
+}
+
+
+
+
+
+
+
 NTSTATUS
 DriverEntry(
 	__in PDRIVER_OBJECT  DriverObject,
 	__in PUNICODE_STRING RegistryPath
 	)
-
-/*++
-
-Routine Description:
-
-	This routine gets called by the system to initialize the driver.
-
-Arguments:
-
-	DriverObject	- the system supplied driver object.
-	RegistryPath	- the system supplied registry path for this driver.
-
-Return Value:
-
-	NTSTATUS
-
---*/
-
 {
 	PDEVICE_OBJECT		deviceObject;
 	NTSTATUS			status;
 	PFAST_IO_DISPATCH	fastIoDispatch;
 	UNICODE_STRING		functionName;
 	FS_FILTER_CALLBACKS filterCallbacks;
-	PDOKAN_GLOBAL		dokanGlobal = NULL;
+	PFUSER_GLOBAL		fuserGlobal = NULL;
 
-	DDbgPrint("==> DriverEntry ver.%x, %s %s\n", DOKAN_DRIVER_VERSION, __DATE__, __TIME__);
+	FDbgPrint("==> DriverEntry\n");
 
-	status = DokanCreateGlobalDiskDevice(DriverObject, &dokanGlobal);
+	status = FuserCreateGlobalDiskDevice(DriverObject, &fuserGlobal);
 
 	if (status != STATUS_SUCCESS) {
 		return status;
-	}
-	//
-	// Set up dispatch entry points for the driver.
-	//
-	DriverObject->DriverUnload								= DokanUnload;
+	}	
+	
+	
+	// - Dispatch-Entry set:
+	DriverObject->DriverUnload								= FuserUnload;
+	DriverObject->MajorFunction[IRP_MJ_CREATE]				= FuserDispatchCreate;	
+	DriverObject->MajorFunction[IRP_MJ_CLOSE]				= FuserDispatchClose;
+	DriverObject->MajorFunction[IRP_MJ_CLEANUP] 			= FuserDispatchCleanup;
+	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]		= FuserDispatchDeviceControl;
+	DriverObject->MajorFunction[IRP_MJ_FILE_SYSTEM_CONTROL] = FuserDispatchFileSystemControl;
 
-	DriverObject->MajorFunction[IRP_MJ_CREATE]				= DokanDispatchCreate;
-	DriverObject->MajorFunction[IRP_MJ_CLOSE]				= DokanDispatchClose;
-	DriverObject->MajorFunction[IRP_MJ_CLEANUP] 			= DokanDispatchCleanup;
+	DriverObject->MajorFunction[IRP_MJ_DIRECTORY_CONTROL]   = FuserDispatchDirectoryControl;
 
-	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL]		= DokanDispatchDeviceControl;
-	DriverObject->MajorFunction[IRP_MJ_FILE_SYSTEM_CONTROL] = DokanDispatchFileSystemControl;
-	DriverObject->MajorFunction[IRP_MJ_DIRECTORY_CONTROL]   = DokanDispatchDirectoryControl;
+	DriverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]   = FuserDispatchQueryInformation;
+    DriverObject->MajorFunction[IRP_MJ_SET_INFORMATION]     = FuserDispatchSetInformation;
 
-	DriverObject->MajorFunction[IRP_MJ_QUERY_INFORMATION]   = DokanDispatchQueryInformation;
-    DriverObject->MajorFunction[IRP_MJ_SET_INFORMATION]     = DokanDispatchSetInformation;
+    DriverObject->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION]	= FuserDispatchQueryVolumeInformation;
+    DriverObject->MajorFunction[IRP_MJ_SET_VOLUME_INFORMATION]		= FuserDispatchSetVolumeInformation;
+	DriverObject->MajorFunction[IRP_MJ_READ]				= FuserDispatchRead;
+	DriverObject->MajorFunction[IRP_MJ_WRITE]				= FuserDispatchWrite;
+	DriverObject->MajorFunction[IRP_MJ_FLUSH_BUFFERS]		= FuserDispatchFlush;
 
-    DriverObject->MajorFunction[IRP_MJ_QUERY_VOLUME_INFORMATION]	= DokanDispatchQueryVolumeInformation;
-    DriverObject->MajorFunction[IRP_MJ_SET_VOLUME_INFORMATION]		= DokanDispatchSetVolumeInformation;
+	DriverObject->MajorFunction[IRP_MJ_SHUTDOWN]            = FuserDispatchShutdown;
+	DriverObject->MajorFunction[IRP_MJ_PNP]					= FuserDispatchPnp;
 
-	DriverObject->MajorFunction[IRP_MJ_READ]				= DokanDispatchRead;
-	DriverObject->MajorFunction[IRP_MJ_WRITE]				= DokanDispatchWrite;
-	DriverObject->MajorFunction[IRP_MJ_FLUSH_BUFFERS]		= DokanDispatchFlush;
+	DriverObject->MajorFunction[IRP_MJ_LOCK_CONTROL]		= FuserDispatchLock;
 
-	DriverObject->MajorFunction[IRP_MJ_SHUTDOWN]            = DokanDispatchShutdown;
-	DriverObject->MajorFunction[IRP_MJ_PNP]					= DokanDispatchPnp;
-
-	DriverObject->MajorFunction[IRP_MJ_LOCK_CONTROL]		= DokanDispatchLock;
-
-	DriverObject->MajorFunction[IRP_MJ_QUERY_SECURITY]		= DokanDispatchQuerySecurity;
-	DriverObject->MajorFunction[IRP_MJ_SET_SECURITY]		= DokanDispatchSetSecurity;
-
-	fastIoDispatch = ExAllocatePool(sizeof(FAST_IO_DISPATCH));
-	// TODO: check fastIoDispatch
-
+	DriverObject->MajorFunction[IRP_MJ_QUERY_SECURITY]		= FuserDispatchQuerySecurity; // TODO: Check if these methods can be removed
+	DriverObject->MajorFunction[IRP_MJ_SET_SECURITY]		= FuserDispatchSetSecurity;   // TODO: Check if these methods can be removed
+	
+	fastIoDispatch = ExAllocatePool(sizeof(FAST_IO_DISPATCH));	
 	RtlZeroMemory(fastIoDispatch, sizeof(FAST_IO_DISPATCH));
 
+
 	fastIoDispatch->SizeOfFastIoDispatch = sizeof(FAST_IO_DISPATCH);
-    fastIoDispatch->FastIoCheckIfPossible = DokanFastIoCheckIfPossible;
-    //fastIoDispatch->FastIoRead = DokanFastIoRead;
+    fastIoDispatch->FastIoCheckIfPossible = FuserFastIoCheckIfPossible;
+    //fastIoDispatch->FastIoRead = FuserFastIoRead;
 	fastIoDispatch->FastIoRead = FsRtlCopyRead;
 	fastIoDispatch->FastIoWrite = FsRtlCopyWrite;
-	fastIoDispatch->AcquireFileForNtCreateSection = DokanAcquireForCreateSection;
-	fastIoDispatch->ReleaseFileForNtCreateSection = DokanReleaseForCreateSection;
+	fastIoDispatch->AcquireFileForNtCreateSection = FuserAcquireForCreateSection;
+	fastIoDispatch->ReleaseFileForNtCreateSection = FuserReleaseForCreateSection;
     fastIoDispatch->MdlRead = FsRtlMdlReadDev;
     fastIoDispatch->MdlReadComplete = FsRtlMdlReadCompleteDev;
     fastIoDispatch->PrepareMdlWrite = FsRtlPrepareMdlWriteDev;
     fastIoDispatch->MdlWriteComplete = FsRtlMdlWriteCompleteDev;
-
 	DriverObject->FastIoDispatch = fastIoDispatch;
 
 
 	ExInitializeNPagedLookasideList(
-		&DokanIrpEntryLookasideList, NULL, NULL, 0, sizeof(IRP_ENTRY), TAG, 0);
-
+		&FuserIrpEntryLookasideList, NULL, NULL, 0, sizeof(IRP_ENTRY), TAG, 0);
 
 #if _WIN32_WINNT < 0x0501
     RtlInitUnicodeString(&functionName, L"FsRtlTeardownPerStreamContexts");
-    DokanFsRtlTeardownPerStreamContexts = MmGetSystemRoutineAddress(&functionName);
+    FuserFsRtlTeardownPerStreamContexts = MmGetSystemRoutineAddress(&functionName);
 #endif
 
     RtlZeroMemory(&filterCallbacks, sizeof(FS_FILTER_CALLBACKS));
 
 	// only be used by filter driver?
 	filterCallbacks.SizeOfFsFilterCallbacks = sizeof(FS_FILTER_CALLBACKS);
-	filterCallbacks.PreAcquireForSectionSynchronization = DokanFilterCallbackAcquireForCreateSection;
+	filterCallbacks.PreAcquireForSectionSynchronization = FuserFilterCallbackAcquireForCreateSection;
 
 	status = FsRtlRegisterFileSystemFilterCallbacks(DriverObject, &filterCallbacks);
-
 	if (!NT_SUCCESS(status)) {
-		IoDeleteDevice(dokanGlobal->DeviceObject);
-		DDbgPrint("  FsRtlRegisterFileSystemFilterCallbacks returned 0x%x\n", status);
+		IoDeleteDevice(fuserGlobal->DeviceObject);
+		FDbgPrint("  FsRtlRegisterFileSystemFilterCallbacks returned 0x%x\n", status);
 		return status;
 	}
 
 
-	DDbgPrint("<== DriverEntry\n");
-
+	FDbgPrint("<== DriverEntry\n");
 	return( status );
 }
 
 
+
 VOID
-DokanUnload(
+FuserUnload(
 	__in PDRIVER_OBJECT DriverObject
 	)
 /*++
@@ -267,45 +243,45 @@ Return Value:
 	NTSTATUS
 
 --*/
-
 {
 
 	PDEVICE_OBJECT	deviceObject = DriverObject->DeviceObject;
-	WCHAR			symbolicLinkBuf[] = DOKAN_GLOBAL_SYMBOLIC_LINK_NAME;
+	WCHAR			symbolicLinkBuf[] = FUSER_GLOBAL_SYMBOLIC_LINK_NAME;
 	UNICODE_STRING	symbolicLinkName;
 
 	PAGED_CODE();
-	DDbgPrint("==> DokanUnload\n");
+	FDbgPrint("==> FuserUnload\n");
 
 	if (GetIdentifierType(deviceObject->DeviceExtension) == DGL) {
-		DDbgPrint("  Delete Global DeviceObject\n");
+		FDbgPrint("  Delete Global DeviceObject\n");
 		RtlInitUnicodeString(&symbolicLinkName, symbolicLinkBuf);
 		IoDeleteSymbolicLink(&symbolicLinkName);
 		IoDeleteDevice(deviceObject);
 	}
 
-	ExDeleteNPagedLookasideList(&DokanIrpEntryLookasideList);
+	ExDeleteNPagedLookasideList(&FuserIrpEntryLookasideList);
 
-	DDbgPrint("<== DokanUnload\n");
+	FDbgPrint("<== FuserUnload\n");
 	return;
 }
 
 
 
+// System shutdown or driver unloading
 NTSTATUS
-DokanDispatchShutdown(
+FuserDispatchShutdown(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
    )
 {
 	PAGED_CODE();
-	DDbgPrint("==> DokanShutdown\n");
+	FDbgPrint("==> FuserShutdown\n");
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-	DDbgPrint("<== DokanShutdown\n");
+	FDbgPrint("<== FuserShutdown\n");
 	return STATUS_SUCCESS;
 }
 
@@ -313,7 +289,7 @@ DokanDispatchShutdown(
 
 
 NTSTATUS
-DokanDispatchPnp(
+FuserDispatchPnp(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
    )
@@ -324,29 +300,29 @@ DokanDispatchPnp(
 	PAGED_CODE();
 
 	__try {
-		DDbgPrint("==> DokanPnp\n");
+		FDbgPrint("==> FuserPnp\n");
 
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 
 		switch (irpSp->MinorFunction) {
 		case IRP_MN_QUERY_REMOVE_DEVICE:
-			DDbgPrint("  IRP_MN_QUERY_REMOVE_DEVICE\n");
+			FDbgPrint("  IRP_MN_QUERY_REMOVE_DEVICE\n");
 			break;
 		case IRP_MN_SURPRISE_REMOVAL:
-			DDbgPrint("  IRP_MN_SURPRISE_REMOVAL\n");
+			FDbgPrint("  IRP_MN_SURPRISE_REMOVAL\n");
 			break;
 		case IRP_MN_REMOVE_DEVICE:
-			DDbgPrint("  IRP_MN_REMOVE_DEVICE\n");
+			FDbgPrint("  IRP_MN_REMOVE_DEVICE\n");
 			break;
 		case IRP_MN_CANCEL_REMOVE_DEVICE:
-			DDbgPrint("  IRP_MN_CANCEL_REMOVE_DEVICE\n");
+			FDbgPrint("  IRP_MN_CANCEL_REMOVE_DEVICE\n");
 			break;
 		case IRP_MN_QUERY_DEVICE_RELATIONS:
-			DDbgPrint("  IRP_MN_QUERY_DEVICE_RELATIONS\n");
+			FDbgPrint("  IRP_MN_QUERY_DEVICE_RELATIONS\n");
 			status = STATUS_INVALID_PARAMETER;
 			break;
 		default:
-			DDbgPrint("   other minnor function %d\n", irpSp->MinorFunction);
+			FDbgPrint("   other minnor function %d\n", irpSp->MinorFunction);
 			break;
 			//IoSkipCurrentIrpStackLocation(Irp);
 			//status = IoCallDriver(Vcb->TargetDeviceObject, Irp);
@@ -356,57 +332,17 @@ DokanDispatchPnp(
 		Irp->IoStatus.Information = 0;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-		DDbgPrint("<== DokanPnp\n");
+		FDbgPrint("<== FuserPnp\n");
 	}
 
 	return status;
 }
 
 
-
-BOOLEAN
-DokanNoOpAcquire(
-    __in PVOID Fcb,
-    __in BOOLEAN Wait
-    )
-{
-    UNREFERENCED_PARAMETER( Fcb );
-    UNREFERENCED_PARAMETER( Wait );
-
-	DDbgPrint("==> DokanNoOpAcquire\n");
-
-    ASSERT(IoGetTopLevelIrp() == NULL);
-
-    IoSetTopLevelIrp((PIRP)FSRTL_CACHE_TOP_LEVEL_IRP);
-
-	DDbgPrint("<== DokanNoOpAcquire\n");
-    
-	return TRUE;
-}
-
+#define PrintStatus(val, flag) if(val == flag) FDbgPrint("  status = " #flag "\n")
 
 VOID
-DokanNoOpRelease(
-    __in PVOID Fcb
-    )
-{
-	DDbgPrint("==> DokanNoOpRelease\n");
-    ASSERT(IoGetTopLevelIrp() == (PIRP)FSRTL_CACHE_TOP_LEVEL_IRP);
-
-    IoSetTopLevelIrp( NULL );
-
-    UNREFERENCED_PARAMETER( Fcb );
-	
-	DDbgPrint("<== DokanNoOpRelease\n");
-    return;
-}
-
-
-#define PrintStatus(val, flag) if(val == flag) DDbgPrint("  status = " #flag "\n")
-
-
-VOID
-DokanPrintNTStatus(
+FuserPrintNTStatus(
 	NTSTATUS	Status)
 {
 	PrintStatus(Status, STATUS_SUCCESS);
@@ -431,17 +367,92 @@ DokanPrintNTStatus(
 }
 
 
+VOID
+PrintIdType(
+	__in VOID* Id)
+{
+	if (Id == NULL) {
+		FDbgPrint("    IdType = NULL\n");
+		return;
+	}
+	switch (GetIdentifierType(Id)) {
+	case DGL:
+		FDbgPrint("    IdType = DGL\n");
+		break;
+	case DCB:
+		FDbgPrint("   IdType = DCB\n");
+		break;
+	case VCB:
+		FDbgPrint("   IdType = VCB\n");
+		break;
+	case FCB:
+		FDbgPrint("   IdType = FCB\n");
+		break;
+	case CCB:
+		FDbgPrint("   IdType = CCB\n");
+		break;
+	default:
+		FDbgPrint("   IdType = Unknown\n");
+		break;
+	}
+}
+
+
+
+
+BOOLEAN
+FuserNoOpAcquire(
+    __in PVOID Fcb,
+    __in BOOLEAN Wait
+    )
+{
+    UNREFERENCED_PARAMETER( Fcb );
+    UNREFERENCED_PARAMETER( Wait );
+
+	FDbgPrint("==> FuserNoOpAcquire\n");
+
+    ASSERT(IoGetTopLevelIrp() == NULL);
+
+    IoSetTopLevelIrp((PIRP)FSRTL_CACHE_TOP_LEVEL_IRP);
+
+	FDbgPrint("<== FuserNoOpAcquire\n");
+    
+	return TRUE;
+}
+
 
 VOID
-DokanNotifyReportChange0(
-	__in PDokanFCB			Fcb,
+FuserNoOpRelease(
+    __in PVOID Fcb
+    )
+{
+	FDbgPrint("==> FuserNoOpRelease\n");
+    ASSERT(IoGetTopLevelIrp() == (PIRP)FSRTL_CACHE_TOP_LEVEL_IRP);
+
+    IoSetTopLevelIrp( NULL );
+
+    UNREFERENCED_PARAMETER( Fcb );
+	
+	FDbgPrint("<== FuserNoOpRelease\n");
+    return;
+}
+
+
+
+
+
+
+
+VOID
+FuserNotifyReportChange0( // TODO: Change name of this method
+	__in PFuserFCB			Fcb,
 	__in PUNICODE_STRING	FileName,
 	__in ULONG				FilterMatch,
 	__in ULONG				Action)
 {
 	USHORT	nameOffset;
 
-	DDbgPrint("==> DokanNotifyReportChange %wZ\n", FileName);
+	FDbgPrint("==> FuserNotifyReportChange %wZ\n", FileName);
 
 	ASSERT(Fcb != NULL);
 	ASSERT(FileName != NULL);
@@ -465,56 +476,28 @@ DokanNotifyReportChange0(
 		Action,
 		NULL); // TargetContext
 
-	DDbgPrint("<== DokanNotifyReportChange\n");
+	FDbgPrint("<== FuserNotifyReportChange\n");
 }
 
 
+
+
 VOID
-DokanNotifyReportChange(
-	__in PDokanFCB	Fcb,
+FuserNotifyReportChange(
+	__in PFuserFCB	Fcb,
 	__in ULONG		FilterMatch,
 	__in ULONG		Action)
 {
 	ASSERT(Fcb != NULL);
-	DokanNotifyReportChange0(Fcb, &Fcb->FileName, FilterMatch, Action);
+	FuserNotifyReportChange0(Fcb, &Fcb->FileName, FilterMatch, Action);
 }
 
-
-VOID
-PrintIdType(
-	__in VOID* Id)
-{
-	if (Id == NULL) {
-		DDbgPrint("    IdType = NULL\n");
-		return;
-	}
-	switch (GetIdentifierType(Id)) {
-	case DGL:
-		DDbgPrint("    IdType = DGL\n");
-		break;
-	case DCB:
-		DDbgPrint("   IdType = DCB\n");
-		break;
-	case VCB:
-		DDbgPrint("   IdType = VCB\n");
-		break;
-	case FCB:
-		DDbgPrint("   IdType = FCB\n");
-		break;
-	case CCB:
-		DDbgPrint("   IdType = CCB\n");
-		break;
-	default:
-		DDbgPrint("   IdType = Unknown\n");
-		break;
-	}
-}
 
 
 BOOLEAN
-DokanCheckCCB(
-	__in PDokanDCB	Dcb,
-	__in PDokanCCB	Ccb)
+FuserCheckCCB(
+	__in PFuserDCB	Dcb,
+	__in PFuserCCB	Ccb)
 {
 	ASSERT(Dcb != NULL);
 	if (GetIdentifierType(Dcb) != DCB) {
@@ -524,17 +507,17 @@ DokanCheckCCB(
 
 	if (Ccb == NULL) {
 		PrintIdType(Dcb);
-		DDbgPrint("   ccb is NULL\n");
+		FDbgPrint("   ccb is NULL\n");
 		return FALSE;
 	}
 
 	if (Ccb->MountId != Dcb->MountId) {
-		DDbgPrint("   MountId is different\n");
+		FDbgPrint("   MountId is different\n");
 		return FALSE;
 	}
 
 	if (!Dcb->Mounted) {
-		DDbgPrint("  Not mounted\n");
+		FDbgPrint("  Not mounted\n");
 		return FALSE;
 	}
 
@@ -542,8 +525,10 @@ DokanCheckCCB(
 }
 
 
+
+
 NTSTATUS
-DokanAllocateMdl(
+FuserAllocateMdl(
 	__in PIRP	Irp,
 	__in ULONG	Length
 	)
@@ -552,14 +537,14 @@ DokanAllocateMdl(
 		Irp->MdlAddress = IoAllocateMdl(Irp->UserBuffer, Length, FALSE, FALSE, Irp);
 
 		if (Irp->MdlAddress == NULL) {
-			DDbgPrint("    IoAllocateMdl returned NULL\n");
+			FDbgPrint("    IoAllocateMdl returned NULL\n");
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 		__try {
 			MmProbeAndLockPages(Irp->MdlAddress, Irp->RequestorMode, IoWriteAccess);
 
 		} __except (EXCEPTION_EXECUTE_HANDLER) {
-			DDbgPrint("    MmProveAndLockPages error\n");
+			FDbgPrint("    MmProveAndLockPages error\n");
 			IoFreeMdl(Irp->MdlAddress);
 			Irp->MdlAddress = NULL;
 			return STATUS_INSUFFICIENT_RESOURCES;
@@ -569,8 +554,11 @@ DokanAllocateMdl(
 }
 
 
+
+
+
 VOID
-DokanFreeMdl(
+FuserFreeMdl(
 	__in PIRP	Irp
 	)
 {
@@ -580,3 +568,23 @@ DokanFreeMdl(
 		Irp->MdlAddress = NULL;
 	}
 }
+
+
+/* TODO: unused:
+BOOLEAN
+FuserFastIoRead (
+    __in PFILE_OBJECT	FileObject,
+    __in PLARGE_INTEGER	FileOffset,
+    __in ULONG			Length,
+    __in BOOLEAN		Wait,
+    __in ULONG			LockKey,
+    __in PVOID			Buffer,
+    __out PIO_STATUS_BLOCK	IoStatus,
+    __in PDEVICE_OBJECT		DeviceObject
+    )
+{
+	FDbgPrint("FuserFastIoRead\n");
+	return FALSE;
+}
+*/
+

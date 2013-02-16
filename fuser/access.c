@@ -1,9 +1,8 @@
 /*
   Dokan : user-mode file system library for Windows
 
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
   Copyright (C) 2010 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,22 +17,22 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 
-HANDLE DOKANAPI
-DokanOpenRequestorToken(PDOKAN_FILE_INFO FileInfo)
+HANDLE FUSERAPI
+FuserOpenRequestorToken(PFUSER_FILE_INFO FileInfo)
 {
-	BOOL	status;
+	BOOL	status = FALSE;
 	ULONG	returnedLength;
-	PDOKAN_INSTANCE		instance;
-	PDOKAN_OPEN_INFO	openInfo;
+	PFUSER_INSTANCE		instance;
+	PFUSER_OPEN_INFO	openInfo;
 	PEVENT_CONTEXT		eventContext;
 	PEVENT_INFORMATION	eventInfo;
 	HANDLE				handle = INVALID_HANDLE_VALUE;
 	ULONG				eventInfoSize;
 	
-	openInfo = (PDOKAN_OPEN_INFO)FileInfo->DokanContext;
+	openInfo = (PFUSER_OPEN_INFO)FileInfo->FuserContext;
 	if (openInfo == NULL) {
 		return INVALID_HANDLE_VALUE;
 	}
@@ -43,7 +42,7 @@ DokanOpenRequestorToken(PDOKAN_FILE_INFO FileInfo)
 		return INVALID_HANDLE_VALUE;
 	}
 
-	instance = openInfo->DokanInstance;
+	instance = openInfo->FuserInstance;
 	if (instance == NULL) {
 		return INVALID_HANDLE_VALUE;
 	}

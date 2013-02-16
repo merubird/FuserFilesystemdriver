@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,11 +18,12 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokan.h"
+
+#include "fuser.h"
 
 
 NTSTATUS
-DokanDispatchRead(
+FuserDispatchRead(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
@@ -52,9 +52,9 @@ Return Value:
 	PVOID				buffer;
 	NTSTATUS			status = STATUS_INVALID_PARAMETER;
 	ULONG				readLength = 0;
-	PDokanCCB			ccb;
-	PDokanFCB			fcb;
-	PDokanVCB			vcb;
+	PFuserCCB			ccb;
+	PFuserFCB			fcb;
+	PFuserVCB			vcb;
 	PEVENT_CONTEXT		eventContext;
 	ULONG				eventLength;
 
@@ -64,20 +64,20 @@ Return Value:
 
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanRead\n");
+		FDbgPrint("==> FuserRead\n");
 
 		irpSp		= IoGetCurrentIrpStackLocation(Irp);
 		fileObject	= irpSp->FileObject;
 
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject == NULL\n");
+			FDbgPrint("  fileObject == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
 		vcb = DeviceObject->DeviceExtension;
 		if (GetIdentifierType(vcb) != VCB ||
-			!DokanCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
+			!FuserCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
@@ -88,7 +88,7 @@ Return Value:
 
 			// irpSp->Parameters.Read.ByteOffset == NULL don't need check?
 	
-			DDbgPrint("use FileObject ByteOffset\n");
+			FDbgPrint("use FileObject ByteOffset\n");
 			
 			byteOffset = fileObject->CurrentByteOffset;
 		
@@ -96,9 +96,9 @@ Return Value:
 			byteOffset	 = irpSp->Parameters.Read.ByteOffset;
 		}
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DokanPrintFileName(fileObject);
-		DDbgPrint("  ByteCount:%d ByteOffset:%d\n", bufferLength, byteOffset);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FuserPrintFileName(fileObject);
+		FDbgPrint("  ByteCount:%d ByteOffset:%d\n", bufferLength, byteOffset);
 
 		if (bufferLength == 0) {
 			status = STATUS_SUCCESS;
@@ -108,7 +108,7 @@ Return Value:
 
 		// make a MDL for UserBuffer that can be used later on another thread context
 		if (Irp->MdlAddress == NULL) {
-			status = DokanAllocateMdl(Irp,  irpSp->Parameters.Read.Length);
+			status = FuserAllocateMdl(Irp,  irpSp->Parameters.Read.Length);
 			if (!NT_SUCCESS(status)) {
 				__leave;
 			}
@@ -120,8 +120,8 @@ Return Value:
 		fcb	= ccb->Fcb;
 		ASSERT(fcb != NULL);
 
-		if (fcb->Flags & DOKAN_FILE_DIRECTORY) {
-			DDbgPrint("   DOKAN_FILE_DIRECTORY %p\n", fcb);
+		if (fcb->Flags & FUSER_FILE_DIRECTORY) {
+			FDbgPrint("   FUSER_FILE_DIRECTORY %p\n", fcb);
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
@@ -136,20 +136,20 @@ Return Value:
 		}
 
 		eventContext->Context = ccb->UserContext;
-		//DDbgPrint("   get Context %X\n", (ULONG)ccb->UserContext);
+		//FDbgPrint("   get Context %X\n", (ULONG)ccb->UserContext);
 
 		if (Irp->Flags & IRP_PAGING_IO) {
-			DDbgPrint("  Paging IO\n");
-			eventContext->FileFlags |= DOKAN_PAGING_IO;
+			FDbgPrint("  Paging IO\n");
+			eventContext->FileFlags |= FUSER_PAGING_IO;
 		}
 		if (fileObject->Flags & FO_SYNCHRONOUS_IO) {
-			DDbgPrint("  Synchronous IO\n");
-			eventContext->FileFlags |= DOKAN_SYNCHRONOUS_IO;
+			FDbgPrint("  Synchronous IO\n");
+			eventContext->FileFlags |= FUSER_SYNCHRONOUS_IO;
 		}
 
 		if (Irp->Flags & IRP_NOCACHE) {
-			DDbgPrint("  Nocache\n");
-			eventContext->FileFlags |= DOKAN_NOCACHE;
+			FDbgPrint("  Nocache\n");
+			eventContext->FileFlags |= FUSER_NOCACHE;
 		}
 
 		// offset of file to read
@@ -165,7 +165,7 @@ Return Value:
 
 
 		// register this IRP to pending IPR list and make it pending status
-		status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);		
+		status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);		
 	} __finally {
 
 		// if IRP status is not pending, must complete current IRP
@@ -173,15 +173,14 @@ Return Value:
 			Irp->IoStatus.Status = status;
 			Irp->IoStatus.Information = readLength;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			DokanPrintNTStatus(status);
+			FuserPrintNTStatus(status);
 		} else {
-			DDbgPrint("  STATUS_PENDING\n");
+			FDbgPrint("  STATUS_PENDING\n");
 		}
 
-		DDbgPrint("<== DokanRead\n");
+		FDbgPrint("<== FuserRead\n");
 		
 		FsRtlExitFileSystem();
-
 	}
 
 	return status;
@@ -189,8 +188,9 @@ Return Value:
 
 
 
+
 VOID
-DokanCompleteRead(
+FuserCompleteRead(
 	__in PIRP_ENTRY			IrpEntry,
 	__in PEVENT_INFORMATION	EventInfo
 	)
@@ -201,13 +201,13 @@ DokanCompleteRead(
 	ULONG				readLength = 0;
 	ULONG				bufferLen  = 0;
 	PVOID				buffer	   = NULL;
-	PDokanCCB			ccb;
+	PFuserCCB			ccb;
 	PFILE_OBJECT		fileObject;
 
 	fileObject = IrpEntry->FileObject;
 	ASSERT(fileObject != NULL);
 
-	DDbgPrint("==> DokanCompleteRead %wZ\n", &fileObject->FileName);
+	FDbgPrint("==> FuserCompleteRead %wZ\n", &fileObject->FileName);
 
 	irp   = IrpEntry->Irp;
 	irpSp = IrpEntry->IrpSp;	
@@ -216,21 +216,21 @@ DokanCompleteRead(
 	ASSERT(ccb != NULL);
 
 	ccb->UserContext = EventInfo->Context;
-	// DDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
+	// FDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
 
 	// buffer which is used to copy Read info
 	if (irp->MdlAddress) {
-		//DDbgPrint("   use MDL Address\n");
+		//FDbgPrint("   use MDL Address\n");
 		buffer = MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
 	} else {
-		//DDbgPrint("   use UserBuffer\n");
+		//FDbgPrint("   use UserBuffer\n");
 		buffer	= irp->UserBuffer;
 	}
 
 	// available buffer size
 	bufferLen = irpSp->Parameters.Read.Length;
 
-	DDbgPrint("  bufferLen %d, Event.BufferLen %d\n", bufferLen, EventInfo->BufferLength);
+	FDbgPrint("  bufferLen %d, Event.BufferLen %d\n", bufferLen, EventInfo->BufferLength);
 
 	// buffer is not specified or short of length
 	if (bufferLen == 0 || buffer == NULL || bufferLen < EventInfo->BufferLength) {
@@ -253,26 +253,26 @@ DokanCompleteRead(
 			// update current byte offset only when synchronous IO and not pagind IO
 			fileObject->CurrentByteOffset.QuadPart =
 				EventInfo->Read.CurrentByteOffset.QuadPart;
-			DDbgPrint("  Updated CurrentByteOffset %I64d\n",
+			FDbgPrint("  Updated CurrentByteOffset %I64d\n",
 				fileObject->CurrentByteOffset.QuadPart); 
 		}
 	}
 
 	if (status == STATUS_SUCCESS) {
-		DDbgPrint("  STATUS_SUCCESS\n");
+		FDbgPrint("  STATUS_SUCCESS\n");
 	} else if (status == STATUS_INSUFFICIENT_RESOURCES) {
-		DDbgPrint("  STATUS_INSUFFICIENT_RESOURCES\n");
+		FDbgPrint("  STATUS_INSUFFICIENT_RESOURCES\n");
 	} else if (status == STATUS_END_OF_FILE) {
-		DDbgPrint("  STATUS_END_OF_FILE\n");
+		FDbgPrint("  STATUS_END_OF_FILE\n");
 	} else {
-		DDbgPrint("  status = 0x%X\n", status);
+		FDbgPrint("  status = 0x%X\n", status);
 	}
 
 	irp->IoStatus.Status = status;
 	irp->IoStatus.Information = readLength;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DDbgPrint("<== DokanCompleteRead\n");
+	FDbgPrint("<== FuserCompleteRead\n");
 }
 
 

@@ -1,10 +1,10 @@
-TARGETNAME=dokan
+TARGETNAME=fuser
 TARGETTYPE=DRIVER
 
 TARGETLIBS= \
 	$(DDK_LIB_PATH)\wdmsec.lib
 
-SOURCES=dokan.c \
+SOURCES=fuser.c \
 	init.c \
 	create.c \
 	close.c \
@@ -23,6 +23,6 @@ SOURCES=dokan.c \
 	notification.c \
 	security.c \
 	access.c \
-	dokan.rc
+	fuser.rc
 
 

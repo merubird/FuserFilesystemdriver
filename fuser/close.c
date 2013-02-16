@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,7 +18,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 
 
@@ -27,25 +26,26 @@ VOID
 DispatchClose(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance)
+	PFUSER_INSTANCE		FuserInstance)
 {
 	PEVENT_INFORMATION		eventInfo;
-	DOKAN_FILE_INFO			fileInfo;	
-	PDOKAN_OPEN_INFO		openInfo;
+	FUSER_FILE_INFO			fileInfo;	
+	PFUSER_OPEN_INFO		openInfo;
 	ULONG					sizeOfEventInfo = sizeof(EVENT_INFORMATION);
 
 	CheckFileName(EventContext->Close.FileName);
 
 	eventInfo = DispatchCommon(
-		EventContext, sizeOfEventInfo, DokanInstance, &fileInfo, &openInfo);
+		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
 	eventInfo->Status = STATUS_SUCCESS; // return success at any case
 
 	DbgPrint("###Close %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
-	if (DokanInstance->DokanOperations->CloseFile) {
+	if (FuserInstance->FuserOperations->CloseFile) {
 		// ignore return value
-		DokanInstance->DokanOperations->CloseFile(
+		// TODO: Adapt the structure of the cleanup so that no return value can be transferred
+		FuserInstance->FuserOperations->CloseFile(
 			EventContext->Close.FileName, &fileInfo);
 	}
 
@@ -53,11 +53,11 @@ DispatchClose(
 	//SendEventInformation(Handle, eventInfo, length);
 
 	if (openInfo != NULL) {
-		EnterCriticalSection(&DokanInstance->CriticalSection);
+		EnterCriticalSection(&FuserInstance->CriticalSection);
 		openInfo->OpenCount--;
-		LeaveCriticalSection(&DokanInstance->CriticalSection);
+		LeaveCriticalSection(&FuserInstance->CriticalSection);
 	}
-	ReleaseDokanOpenInfo(eventInfo, DokanInstance);
+	ReleaseFuserOpenInfo(eventInfo, FuserInstance);
 	free(eventInfo);
 
 	return;

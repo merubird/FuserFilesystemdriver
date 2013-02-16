@@ -1,9 +1,8 @@
 /*
   Dokan : user-mode file system library for Windows
 
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
   Copyright (C) 2010 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,21 +17,24 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <process.h>
-#include "dokani.h"
 
-BOOL DOKANAPI
-DokanResetTimeout(ULONG Timeout, PDOKAN_FILE_INFO FileInfo)
+
+#include <process.h>
+#include "fuseri.h"
+
+
+BOOL FUSERAPI
+FuserResetTimeout(ULONG Timeout, PFUSER_FILE_INFO FileInfo)
 {
 	BOOL	status;
 	ULONG	returnedLength;
-	PDOKAN_INSTANCE		instance;
-	PDOKAN_OPEN_INFO	openInfo;
+	PFUSER_INSTANCE		instance;
+	PFUSER_OPEN_INFO	openInfo;
 	PEVENT_CONTEXT		eventContext;
 	PEVENT_INFORMATION	eventInfo;
 	ULONG	eventInfoSize = sizeof(EVENT_INFORMATION);
 
-	openInfo = (PDOKAN_OPEN_INFO)FileInfo->DokanContext;
+	openInfo = (PFUSER_OPEN_INFO)FileInfo->FuserContext;
 	if (openInfo == NULL) {
 		return FALSE;
 	}
@@ -42,7 +44,7 @@ DokanResetTimeout(ULONG Timeout, PDOKAN_FILE_INFO FileInfo)
 		return FALSE;
 	}
 
-	instance = openInfo->DokanInstance;
+	instance = openInfo->FuserInstance;
 	if (instance == NULL) {
 		return FALSE;
 	}
@@ -66,9 +68,13 @@ DokanResetTimeout(ULONG Timeout, PDOKAN_FILE_INFO FileInfo)
 }
 
 
+
+
+
+
 DWORD WINAPI
-DokanKeepAlive(
-	PDOKAN_INSTANCE DokanInstance)
+FuserKeepAlive(
+	PFUSER_INSTANCE FuserInstance)
 {
 	HANDLE	device;
 	ULONG	ReturnedLength;
@@ -76,7 +82,7 @@ DokanKeepAlive(
 	BOOL	status;
 
 	device = CreateFile(
-				GetRawDeviceName(DokanInstance->DeviceName),
+				GetRawDeviceName(FuserInstance->DeviceName),
 				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
                 FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
                 NULL,                               // lpSecurityAttributes
@@ -100,7 +106,7 @@ DokanKeepAlive(
 		if (!status) {
 			break;
 		}
-		Sleep(DOKAN_KEEPALIVE_TIME);
+		Sleep(FUSER_KEEPALIVE_TIME);
 	}
 
 	CloseHandle(device);
@@ -108,3 +114,4 @@ DokanKeepAlive(
 	_endthreadex(0);
 	return 0;
 }
+

@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -22,11 +21,13 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #ifndef _LIST_H_
 #define _LIST_H_
 
+
 #include <windows.h>
 
 #if _MSC_VER < 1300
 #define FORCEINLINE __inline
 #endif
+
 
 FORCEINLINE
 VOID
@@ -36,6 +37,7 @@ InitializeListHead(
     ListHead->Flink = ListHead->Blink = ListHead;
 }
 
+
 FORCEINLINE
 BOOLEAN
 IsListEmpty(
@@ -43,6 +45,25 @@ IsListEmpty(
 {
     return (BOOLEAN)(ListHead == NULL || ListHead->Flink == ListHead);
 }
+
+
+
+
+FORCEINLINE
+PLIST_ENTRY
+RemoveHeadList(
+    PLIST_ENTRY ListHead)
+{
+    PLIST_ENTRY Flink;
+    PLIST_ENTRY Entry;
+
+    Entry = ListHead->Flink;
+    Flink = Entry->Flink;
+    ListHead->Flink = Flink;
+    Flink->Blink = ListHead;
+    return Entry;
+}
+
 
 FORCEINLINE
 BOOLEAN
@@ -63,37 +84,7 @@ RemoveEntryList(
     return TRUE;
 }
 
-FORCEINLINE
-PLIST_ENTRY
-RemoveHeadList(
-    PLIST_ENTRY ListHead)
-{
-    PLIST_ENTRY Flink;
-    PLIST_ENTRY Entry;
 
-    Entry = ListHead->Flink;
-    Flink = Entry->Flink;
-    ListHead->Flink = Flink;
-    Flink->Blink = ListHead;
-    return Entry;
-}
-
-
-
-FORCEINLINE
-PLIST_ENTRY
-RemoveTailList(
-    PLIST_ENTRY ListHead)
-{
-    PLIST_ENTRY Blink;
-    PLIST_ENTRY Entry;
-
-    Entry = ListHead->Blink;
-    Blink = Entry->Blink;
-    ListHead->Blink = Blink;
-    Blink->Flink = ListHead;
-    return Entry;
-}
 
 
 FORCEINLINE
@@ -111,6 +102,27 @@ InsertTailList(
     ListHead->Blink = Entry;
 }
 
+#endif
+
+
+
+
+
+/* TODO: obsolete and unused, can be removed
+FORCEINLINE
+PLIST_ENTRY
+RemoveTailList(
+    PLIST_ENTRY ListHead)
+{
+    PLIST_ENTRY Blink;
+    PLIST_ENTRY Entry;
+
+    Entry = ListHead->Blink;
+    Blink = Entry->Blink;
+    ListHead->Blink = Blink;
+    Blink->Flink = ListHead;
+    return Entry;
+}
 
 FORCEINLINE
 VOID
@@ -155,7 +167,6 @@ PopEntryList(
     return FirstEntry;
 }
 
-
 FORCEINLINE
 VOID
 PushEntryList(
@@ -165,5 +176,5 @@ PushEntryList(
     Entry->Next = ListHead->Next;
     ListHead->Next = Entry;
 }
+*/
 
-#endif

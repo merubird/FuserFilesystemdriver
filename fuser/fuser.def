@@ -1,20 +1,19 @@
 
-LIBRARY	dokan
+LIBRARY	fuser
 
 EXPORTS
 
-DokanMain
-DokanUnmount
-DokanIsNameInExpression
-DokanServiceInstall
-DokanServiceDelete
-DokanVersion
-DokanDriverVersion
-DokanResetTimeout
-DokanNetworkProviderInstall
-DokanNetworkProviderUninstall
-DokanSetDebugMode
-DokanMountControl
-DokanOpenRequestorToken
-DokanRemoveMountPoint
-
+FuserMain
+FuserUnmount
+FuserRemoveMountPoint
+FuserMountControl
+FuserVersion
+FuserDriverVersion
+FuserServiceInstall
+FuserServiceDelete
+FuserOpenRequestorToken
+FuserNetworkProviderInstall
+FuserNetworkProviderUninstall
+FuserSetDebugMode
+FuserIsNameInExpression
+FuserResetTimeout

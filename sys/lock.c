@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,11 +18,12 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokan.h"
+
+#include "fuser.h"
 
 
 NTSTATUS
-DokanDispatchLock(
+FuserDispatchLock(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
@@ -31,9 +31,9 @@ DokanDispatchLock(
 	PIO_STACK_LOCATION	irpSp;
 	NTSTATUS			status = STATUS_INVALID_PARAMETER;
 	PFILE_OBJECT		fileObject;
-	PDokanCCB			ccb;
-	PDokanFCB			fcb;
-	PDokanVCB			vcb;
+	PFuserCCB			ccb;
+	PFuserFCB			fcb;
+	PFuserVCB			vcb;
 	PEVENT_CONTEXT		eventContext;
 	ULONG				eventLength;
 
@@ -42,42 +42,42 @@ DokanDispatchLock(
 	__try {
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanLock\n");
+		FDbgPrint("==> FuserLock\n");
 	
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 		fileObject = irpSp->FileObject;
 
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject == NULL\n");
+			FDbgPrint("  fileObject == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
 		vcb = DeviceObject->DeviceExtension;
 		if (GetIdentifierType(vcb) != VCB ||
-			!DokanCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
+			!FuserCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DokanPrintFileName(fileObject);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FuserPrintFileName(fileObject);
 
 		switch(irpSp->MinorFunction) {
 		case IRP_MN_LOCK:
-			DDbgPrint("  IRP_MN_LOCK\n");
+			FDbgPrint("  IRP_MN_LOCK\n");
 			break;
 		case IRP_MN_UNLOCK_ALL:
-			DDbgPrint("  IRP_MN_UNLOCK_ALL\n");
+			FDbgPrint("  IRP_MN_UNLOCK_ALL\n");
 			break;
 		case IRP_MN_UNLOCK_ALL_BY_KEY:
-			DDbgPrint("  IRP_MN_UNLOCK_ALL_BY_KEY\n");
+			FDbgPrint("  IRP_MN_UNLOCK_ALL_BY_KEY\n");
 			break;
 		case IRP_MN_UNLOCK_SINGLE:
-			DDbgPrint("  IRP_MN_UNLOCK_SINGLE\n");
+			FDbgPrint("  IRP_MN_UNLOCK_SINGLE\n");
 			break;
 		default:
-			DDbgPrint("  unknown function : %d\n", irpSp->MinorFunction);
+			FDbgPrint("  unknown function : %d\n", irpSp->MinorFunction);
 			break;
 		}
 
@@ -96,7 +96,7 @@ DokanDispatchLock(
 		}
 
 		eventContext->Context = ccb->UserContext;
-		DDbgPrint("   get Context %X\n", (ULONG)ccb->UserContext);
+		FDbgPrint("   get Context %X\n", (ULONG)ccb->UserContext);
 
 		// copy file name to be locked
 		eventContext->Lock.FileNameLength = fcb->FileName.Length;
@@ -107,12 +107,12 @@ DokanDispatchLock(
 		if (irpSp->Parameters.LockControl.Length != NULL) {
 			eventContext->Lock.Length.QuadPart = irpSp->Parameters.LockControl.Length->QuadPart;
 		} else {
-			DDbgPrint("  LockControl.Length = NULL\n");
+			FDbgPrint("  LockControl.Length = NULL\n");
 		}
 		eventContext->Lock.Key = irpSp->Parameters.LockControl.Key;
 
 		// register this IRP to waiting IRP list and make it pending status
-		status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
+		status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
 
 	} __finally {
 
@@ -123,10 +123,10 @@ DokanDispatchLock(
 			Irp->IoStatus.Status = status;
 			Irp->IoStatus.Information = 0;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			DokanPrintNTStatus(status);
+			FuserPrintNTStatus(status);
 		}
 
-		DDbgPrint("<== DokanLock\n");
+		FDbgPrint("<== FuserLock\n");
 		FsRtlExitFileSystem();
 	}
 
@@ -134,15 +134,17 @@ DokanDispatchLock(
 }
 
 
+
+
 VOID
-DokanCompleteLock(
+FuserCompleteLock(
 	__in PIRP_ENTRY			IrpEntry,
 	__in PEVENT_INFORMATION	EventInfo
 	)
 {
 	PIRP				irp;
 	PIO_STACK_LOCATION	irpSp;
-	PDokanCCB			ccb;
+	PFuserCCB			ccb;
 	PFILE_OBJECT		fileObject;
 	NTSTATUS			status;
 
@@ -151,23 +153,24 @@ DokanCompleteLock(
 
 	//FsRtlEnterFileSystem();
 
-	DDbgPrint("==> DokanCompleteLock\n");
+	FDbgPrint("==> FuserCompleteLock\n");
 
 	fileObject = irpSp->FileObject;
 	ccb = fileObject->FsContext2;
 	ASSERT(ccb != NULL);
 
 	ccb->UserContext = EventInfo->Context;
-	// DDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
+	// FDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
 
 	status = EventInfo->Status;
 	irp->IoStatus.Status = status;
 	irp->IoStatus.Information = 0;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DokanPrintNTStatus(status);
+	FuserPrintNTStatus(status);
 
-	DDbgPrint("<== DokanCompleteLock\n");
+	FDbgPrint("<== FuserCompleteLock\n");
 
 	//FsRtlExitFileSystem();
 }
+

@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,245 +17,20 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "fuser.h"
 
-#include "dokan.h"
 
 #ifdef ALLOC_PRAGMA
-#pragma alloc_text (PAGE, DokanDispatchCreate)
+#pragma alloc_text (PAGE, FuserDispatchCreate)
 #endif
-
-
-// We must NOT call without VCB lcok
-PDokanFCB
-DokanAllocateFCB(
-	__in PDokanVCB Vcb
-	)
-{
-	PDokanFCB fcb = ExAllocatePool(sizeof(DokanFCB));
-
-	if (fcb == NULL) {
-		return NULL;
-	}
-
-	ASSERT(fcb != NULL);
-	ASSERT(Vcb != NULL);
-
-	RtlZeroMemory(fcb, sizeof(DokanFCB));
-
-	fcb->Identifier.Type = FCB;
-	fcb->Identifier.Size = sizeof(DokanFCB);
-
-	fcb->Vcb = Vcb;
-
-	ExInitializeResourceLite(&fcb->MainResource);
-	ExInitializeResourceLite(&fcb->PagingIoResource);
-
-	ExInitializeFastMutex(&fcb->AdvancedFCBHeaderMutex);
-
-#if _WIN32_WINNT >= 0x0501
-	FsRtlSetupAdvancedHeader(&fcb->AdvancedFCBHeader, &fcb->AdvancedFCBHeaderMutex);
-#else
-	if (DokanFsRtlTeardownPerStreamContexts) {
-		FsRtlSetupAdvancedHeader(&fcb->AdvancedFCBHeader, &fcb->AdvancedFCBHeaderMutex);
-	}
-#endif
-
-
-	fcb->AdvancedFCBHeader.ValidDataLength.LowPart = 0xffffffff;
-	fcb->AdvancedFCBHeader.ValidDataLength.HighPart = 0x7fffffff;
-
-	fcb->AdvancedFCBHeader.Resource = &fcb->MainResource;
-	fcb->AdvancedFCBHeader.PagingIoResource = &fcb->PagingIoResource;
-
-	fcb->AdvancedFCBHeader.AllocationSize.QuadPart = 4096;
-	fcb->AdvancedFCBHeader.FileSize.QuadPart = 4096;
-
-	fcb->AdvancedFCBHeader.IsFastIoPossible = FastIoIsNotPossible;
-
-	ExInitializeResourceLite(&fcb->Resource);
-
-	InitializeListHead(&fcb->NextCCB);
-	InsertTailList(&Vcb->NextFCB, &fcb->NextFCB);
-
-	InterlockedIncrement(&Vcb->FcbAllocated);
-
-	return fcb;
-}
-
-
-PDokanFCB
-DokanGetFCB(
-	__in PDokanVCB	Vcb,
-	__in PWCHAR		FileName,
-	__in ULONG		FileNameLength)
-{
-	PLIST_ENTRY		thisEntry, nextEntry, listHead;
-	PDokanFCB		fcb = NULL;
-	ULONG			pos;
-
-	KeEnterCriticalRegion();
-	ExAcquireResourceExclusiveLite(&Vcb->Resource, TRUE);
-
-	// search the FCB which is already allocated
-	// (being used now)
-	listHead = &Vcb->NextFCB;
-
-    for (thisEntry = listHead->Flink;
-			thisEntry != listHead;
-			thisEntry = nextEntry) {
-
-		nextEntry = thisEntry->Flink;
-
-        fcb = CONTAINING_RECORD(thisEntry, DokanFCB, NextFCB);
-
-		if (fcb->FileName.Length == FileNameLength) {
-			// FileNameLength in bytes
-			for (pos = 0; pos < FileNameLength/sizeof(WCHAR); ++pos) {
-				if (fcb->FileName.Buffer[pos] != FileName[pos])
-					break;
-			}
-			// we have the FCB which is already allocated and used
-			if (pos == FileNameLength/sizeof(WCHAR))
-				break;
-		}
-
-		fcb = NULL;
-	}
-
-	// we don't have FCB
-	if (fcb == NULL) {
-		DDbgPrint("  Allocate FCB\n");
-		
-		fcb = DokanAllocateFCB(Vcb);
-		
-		// no memory?
-		if (fcb == NULL) {
-			ExFreePool(FileName);
-			ExReleaseResourceLite(&Vcb->Resource);
-			KeLeaveCriticalRegion();
-			return NULL;
-		}
-
-		ASSERT(fcb != NULL);
-
-		fcb->FileName.Buffer = FileName;
-		fcb->FileName.Length = (USHORT)FileNameLength;
-		fcb->FileName.MaximumLength = (USHORT)FileNameLength;
-
-	// we already have FCB
-	} else {
-		// FileName (argument) is never used and must be freed
-		ExFreePool(FileName);
-	}
-
-	ExReleaseResourceLite(&Vcb->Resource);
-	KeLeaveCriticalRegion();
-
-	InterlockedIncrement(&fcb->FileCount);
-	return fcb;
-}
-
 
 
 NTSTATUS
-DokanFreeFCB(
-  __in PDokanFCB Fcb
+FuserFreeCCB(
+  __in PFuserCCB ccb
   )
 {
-	PDokanVCB vcb;
-
-	ASSERT(Fcb != NULL);
-
-	vcb = Fcb->Vcb;
-
-	KeEnterCriticalRegion();
-	ExAcquireResourceExclusiveLite(&vcb->Resource, TRUE);
-	ExAcquireResourceExclusiveLite(&Fcb->Resource, TRUE);
-
-	Fcb->FileCount--;
-
-	if (Fcb->FileCount == 0) {
-
-		RemoveEntryList(&Fcb->NextFCB);
-
-		DDbgPrint("  Free FCB:%X\n", Fcb);
-		ExFreePool(Fcb->FileName.Buffer);
-
-#if _WIN32_WINNT >= 0x0501
-		FsRtlTeardownPerStreamContexts(&Fcb->AdvancedFCBHeader);
-#else
-		if (DokanFsRtlTeardownPerStreamContexts) {
-			DokanFsRtlTeardownPerStreamContexts(&Fcb->AdvancedFCBHeader);
-		}
-#endif
-		ExReleaseResourceLite(&Fcb->Resource);
-
-		ExDeleteResourceLite(&Fcb->Resource);
-		ExDeleteResourceLite(&Fcb->MainResource);
-		ExDeleteResourceLite(&Fcb->PagingIoResource);
-
-		InterlockedIncrement(&vcb->FcbFreed);
-		ExFreePool(Fcb);
-
-	} else {
-		ExReleaseResourceLite(&Fcb->Resource);
-	}
-
-	ExReleaseResourceLite(&vcb->Resource);
-	KeLeaveCriticalRegion();
-
-	return STATUS_SUCCESS;
-}
-
-
-
-PDokanCCB
-DokanAllocateCCB(
-	__in PDokanDCB	Dcb,
-	__in PDokanFCB	Fcb
-	)
-{
-	PDokanCCB ccb = ExAllocatePool(sizeof(DokanCCB));
-
-	if (ccb == NULL)
-		return NULL;
-
-	ASSERT(ccb != NULL);
-	ASSERT(Fcb != NULL);
-
-	RtlZeroMemory(ccb, sizeof(DokanCCB));
-
-	ccb->Identifier.Type = CCB;
-	ccb->Identifier.Size = sizeof(DokanCCB);
-
-	ccb->Fcb = Fcb;
-
-	ExInitializeResourceLite(&ccb->Resource);
-
-	InitializeListHead(&ccb->NextCCB);
-
-	KeEnterCriticalRegion();
-	ExAcquireResourceExclusiveLite(&Fcb->Resource, TRUE);
-
-	InsertTailList(&Fcb->NextCCB, &ccb->NextCCB);
-
-	ExReleaseResourceLite(&Fcb->Resource);
-	KeLeaveCriticalRegion();
-
-	ccb->MountId = Dcb->MountId;
-
-	InterlockedIncrement(&Fcb->Vcb->CcbAllocated);
-	return ccb;
-}
-
-
-
-NTSTATUS
-DokanFreeCCB(
-  __in PDokanCCB ccb
-  )
-{
-	PDokanFCB fcb;
+	PFuserFCB fcb;
 
 	ASSERT(ccb != NULL);
 	
@@ -283,8 +57,231 @@ DokanFreeCCB(
 }
 
 
+// We must NOT call without VCB lock
+PFuserFCB
+FuserAllocateFCB(
+	__in PFuserVCB Vcb
+	)
+{
+	PFuserFCB fcb = ExAllocatePool(sizeof(FuserFCB));
+	if (fcb == NULL) {
+		return NULL;
+	}
+
+	ASSERT(fcb != NULL);
+	ASSERT(Vcb != NULL);
+
+	RtlZeroMemory(fcb, sizeof(FuserFCB));
+
+	fcb->Identifier.Type = FCB;
+	fcb->Identifier.Size = sizeof(FuserFCB);
+
+	fcb->Vcb = Vcb;
+
+	ExInitializeResourceLite(&fcb->MainResource);
+	ExInitializeResourceLite(&fcb->PagingIoResource);
+
+	ExInitializeFastMutex(&fcb->AdvancedFCBHeaderMutex);
+
+	
+#if _WIN32_WINNT >= 0x0501 
+	FsRtlSetupAdvancedHeader(&fcb->AdvancedFCBHeader, &fcb->AdvancedFCBHeaderMutex);
+#else
+	if (FuserFsRtlTeardownPerStreamContexts) {
+		FsRtlSetupAdvancedHeader(&fcb->AdvancedFCBHeader, &fcb->AdvancedFCBHeaderMutex);
+	}	
+#endif
+
+	fcb->AdvancedFCBHeader.ValidDataLength.LowPart = 0xffffffff;
+	fcb->AdvancedFCBHeader.ValidDataLength.HighPart = 0x7fffffff;
+
+	fcb->AdvancedFCBHeader.Resource = &fcb->MainResource;
+	fcb->AdvancedFCBHeader.PagingIoResource = &fcb->PagingIoResource;
+
+	fcb->AdvancedFCBHeader.AllocationSize.QuadPart = 4096;
+	fcb->AdvancedFCBHeader.FileSize.QuadPart = 4096;
+
+	fcb->AdvancedFCBHeader.IsFastIoPossible = FastIoIsNotPossible;
+
+	ExInitializeResourceLite(&fcb->Resource);
+
+	InitializeListHead(&fcb->NextCCB);
+	InsertTailList(&Vcb->NextFCB, &fcb->NextFCB); // Critical region, change list
+
+	InterlockedIncrement(&Vcb->FcbAllocated);
+
+	return fcb;
+}
+
+
+NTSTATUS
+FuserFreeFCB(
+  __in PFuserFCB Fcb
+  )
+{
+	PFuserVCB vcb;
+
+	ASSERT(Fcb != NULL);
+
+	vcb = Fcb->Vcb;
+
+	KeEnterCriticalRegion();
+	ExAcquireResourceExclusiveLite(&vcb->Resource, TRUE);
+	ExAcquireResourceExclusiveLite(&Fcb->Resource, TRUE);
+
+	Fcb->FileCount--;
+
+	if (Fcb->FileCount == 0) {
+
+		RemoveEntryList(&Fcb->NextFCB);
+
+		FDbgPrint("  Free FCB:%X\n", Fcb);
+		ExFreePool(Fcb->FileName.Buffer);
+
+#if _WIN32_WINNT >= 0x0501
+		FsRtlTeardownPerStreamContexts(&Fcb->AdvancedFCBHeader);
+#else
+		if (FuserFsRtlTeardownPerStreamContexts) {
+			FuserFsRtlTeardownPerStreamContexts(&Fcb->AdvancedFCBHeader);
+		}
+#endif
+		ExReleaseResourceLite(&Fcb->Resource);
+
+		ExDeleteResourceLite(&Fcb->Resource);
+		ExDeleteResourceLite(&Fcb->MainResource);
+		ExDeleteResourceLite(&Fcb->PagingIoResource);
+
+		InterlockedIncrement(&vcb->FcbFreed);
+		ExFreePool(Fcb);
+
+	} else {
+		ExReleaseResourceLite(&Fcb->Resource);
+	}
+
+	ExReleaseResourceLite(&vcb->Resource);
+	KeLeaveCriticalRegion();
+
+	return STATUS_SUCCESS;
+}
+
+
+PFuserFCB
+FuserGetFCB(
+	__in PFuserVCB	Vcb,
+	__in PWCHAR		FileName,
+	__in ULONG		FileNameLength)
+{
+	PLIST_ENTRY		thisEntry, nextEntry, listHead;
+	PFuserFCB		fcb = NULL;
+	ULONG			pos;
+
+	KeEnterCriticalRegion();
+	ExAcquireResourceExclusiveLite(&Vcb->Resource, TRUE);
+
+	// search the FCB which is already allocated
+	// (being used now)
+	listHead = &Vcb->NextFCB;
+    for (thisEntry = listHead->Flink;
+			thisEntry != listHead;
+			thisEntry = nextEntry) {
+
+		nextEntry = thisEntry->Flink;
+
+        fcb = CONTAINING_RECORD(thisEntry, FuserFCB, NextFCB);
+
+		if (fcb->FileName.Length == FileNameLength) {
+			// FileNameLength in bytes
+			for (pos = 0; pos < FileNameLength/sizeof(WCHAR); ++pos) {
+				if (fcb->FileName.Buffer[pos] != FileName[pos])
+					break;
+			}
+			// we have the FCB which is already allocated and used
+			if (pos == FileNameLength/sizeof(WCHAR))
+				break;
+		}
+
+		fcb = NULL;
+	}
+
+	// we don't have FCB
+	if (fcb == NULL) {
+		FDbgPrint("  Allocate FCB\n");
+
+		fcb = FuserAllocateFCB(Vcb);
+		// no memory?
+		if (fcb == NULL) {
+			ExFreePool(FileName);
+			ExReleaseResourceLite(&Vcb->Resource);
+			KeLeaveCriticalRegion();
+			return NULL;
+		}
+
+		ASSERT(fcb != NULL);
+
+		fcb->FileName.Buffer = FileName;
+		fcb->FileName.Length = (USHORT)FileNameLength;
+		fcb->FileName.MaximumLength = (USHORT)FileNameLength;
+
+	// we already have FCB
+	} else {
+		// FileName (argument) is never used and must be freed
+		ExFreePool(FileName);
+	}
+
+	ExReleaseResourceLite(&Vcb->Resource);
+	KeLeaveCriticalRegion();
+
+	InterlockedIncrement(&fcb->FileCount);	
+	return fcb;
+}
+
+
+// Take care of Lock itself
+PFuserCCB
+FuserAllocateCCB(
+	__in PFuserDCB	Dcb,
+	__in PFuserFCB	Fcb
+	)
+{
+	PFuserCCB ccb = ExAllocatePool(sizeof(FuserCCB));
+
+	if (ccb == NULL)
+		return NULL;
+
+	ASSERT(ccb != NULL);
+	ASSERT(Fcb != NULL);
+
+	RtlZeroMemory(ccb, sizeof(FuserCCB));
+
+	ccb->Identifier.Type = CCB;
+	ccb->Identifier.Size = sizeof(FuserCCB);
+
+	ccb->Fcb = Fcb;
+
+	ExInitializeResourceLite(&ccb->Resource);
+
+	InitializeListHead(&ccb->NextCCB);
+
+	KeEnterCriticalRegion();
+	ExAcquireResourceExclusiveLite(&Fcb->Resource, TRUE);
+
+	InsertTailList(&Fcb->NextCCB, &ccb->NextCCB);
+
+	ExReleaseResourceLite(&Fcb->Resource);
+	KeLeaveCriticalRegion();
+
+	ccb->MountId = Dcb->MountId;
+
+	InterlockedIncrement(&Fcb->Vcb->CcbAllocated);
+	return ccb;
+}
+
+
+
+
+
 LONG
-DokanUnicodeStringChar(
+FuserUnicodeStringChar(
 	__in PUNICODE_STRING UnicodeString,
 	__in WCHAR	Char)
 {
@@ -301,16 +298,15 @@ DokanUnicodeStringChar(
 VOID
 SetFileObjectForVCB(
 	__in PFILE_OBJECT	FileObject,
-	__in PDokanVCB		Vcb)
+	__in PFuserVCB		Vcb)
 {
 	FileObject->SectionObjectPointer = &Vcb->SectionObjectPointers;
 	FileObject->FsContext = &Vcb->VolumeFileHeader;
 }
 
 
-
 NTSTATUS
-DokanDispatchCreate(
+FuserDispatchCreate(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
@@ -332,8 +328,10 @@ Return Value:
 
 --*/
 {
-	PDokanVCB			vcb;
-	PDokanDCB			dcb;
+
+	PFuserVCB			vcb;
+	PFuserDCB			dcb;
+
 	PIO_STACK_LOCATION	irpSp;
 	NTSTATUS			status = STATUS_INVALID_PARAMETER;
 	PFILE_OBJECT		fileObject;
@@ -344,31 +342,30 @@ Return Value:
 	PFILE_OBJECT		relatedFileObject;
 	ULONG				fileNameLength = 0;
 	ULONG				eventLength;
-	PDokanFCB			fcb;
-	PDokanCCB			ccb;
+	PFuserFCB			fcb;
+	PFuserCCB			ccb;
 	PWCHAR				fileName;
 	BOOLEAN				needBackSlashAfterRelatedFile = FALSE;
 	HANDLE				accessTokenHandle;
-
 	PAGED_CODE();
-
+	
 	__try {
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanCreate\n");
+		FDbgPrint("==> FuserCreate\n");
 
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 		fileObject = irpSp->FileObject;
 		relatedFileObject = fileObject->RelatedFileObject;
 
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject == NULL\n");
+			FDbgPrint("  fileObject == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DDbgPrint("  FileName:%wZ\n", &fileObject->FileName);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FDbgPrint("  FileName:%wZ\n", &fileObject->FileName);
 
 		vcb = DeviceObject->DeviceExtension;
 		PrintIdType(vcb);
@@ -378,18 +375,18 @@ Return Value:
 		}
 		dcb = vcb->Dcb;
 
-		DDbgPrint("  IrpSp->Flags = %d\n", irpSp->Flags);
+		FDbgPrint("  IrpSp->Flags = %d\n", irpSp->Flags);
 		if (irpSp->Flags & SL_CASE_SENSITIVE) {
-			DDbgPrint("  IrpSp->Flags SL_CASE_SENSITIVE\n");
+			FDbgPrint("  IrpSp->Flags SL_CASE_SENSITIVE\n");
 		}
 		if (irpSp->Flags & SL_FORCE_ACCESS_CHECK) {
-			DDbgPrint("  IrpSp->Flags SL_FORCE_ACCESS_CHECK\n");
+			FDbgPrint("  IrpSp->Flags SL_FORCE_ACCESS_CHECK\n");
 		}
 		if (irpSp->Flags & SL_OPEN_PAGING_FILE) {
-			DDbgPrint("  IrpSp->Flags SL_OPEN_PAGING_FILE\n");
+			FDbgPrint("  IrpSp->Flags SL_OPEN_PAGING_FILE\n");
 		}
 		if (irpSp->Flags & SL_OPEN_TARGET_DIRECTORY) {
-			DDbgPrint("  IrpSp->Flags SL_OPEN_TARGET_DIRECTORY\n");
+			FDbgPrint("  IrpSp->Flags SL_OPEN_TARGET_DIRECTORY\n");
 		}
 
 	   if ((fileObject->FileName.Length > sizeof(WCHAR)) &&
@@ -412,7 +409,7 @@ Return Value:
 		if ((relatedFileObject == NULL || relatedFileObject->FileName.Length == 0) &&
 			fileObject->FileName.Length == 0) {
 
-			DDbgPrint("   request for FS device\n");
+			FDbgPrint("   request for FS device\n");
 
 			if (irpSp->Parameters.Create.Options & FILE_DIRECTORY_FILE) {
 				status = STATUS_NOT_A_DIRECTORY;
@@ -435,7 +432,7 @@ Return Value:
 
 			if (fileObject->FileName.Length > 0 &&
 				fileObject->FileName.Buffer[0] == '\\') {
-				DDbgPrint("  when RelatedFileObject is specified, the file name should be relative path\n");
+				FDbgPrint("  when RelatedFileObject is specified, the file name should be relative path\n");
 				status = STATUS_OBJECT_NAME_INVALID;
 				__leave;
 			}
@@ -448,14 +445,14 @@ Return Value:
 
 		// don't open file like stream
 		if (!dcb->UseAltStream &&
-			DokanUnicodeStringChar(&fileObject->FileName, L':') != -1) {
-			DDbgPrint("    alternate stream\n");
+			FuserUnicodeStringChar(&fileObject->FileName, L':') != -1) {
+			FDbgPrint("    alternate stream\n");
 			status = STATUS_INVALID_PARAMETER;
 			info = 0;
 			__leave;
 		}
 			
-		// this memory is freed by DokanGetFCB if needed
+		// this memory is freed by FuserGetFCB if needed
 		// "+ sizeof(WCHAR)" is for the last NULL character
 		fileName = ExAllocatePool(fileNameLength + sizeof(WCHAR));
 		if (fileName == NULL) {
@@ -466,7 +463,7 @@ Return Value:
 		RtlZeroMemory(fileName, fileNameLength + sizeof(WCHAR));
 
 		if (relatedFileObject != NULL) {
-			DDbgPrint("  RelatedFileName:%wZ\n", &relatedFileObject->FileName);
+			FDbgPrint("  RelatedFileName:%wZ\n", &relatedFileObject->FileName);
 
 			// copy the file name of related file object
 			RtlCopyMemory(fileName,
@@ -490,7 +487,8 @@ Return Value:
 							fileObject->FileName.Length);
 		}
 
-		fcb = DokanGetFCB(vcb, fileName, fileNameLength);
+
+		fcb = FuserGetFCB(vcb, fileName, fileNameLength);
 		if (fcb == NULL) {
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			__leave;
@@ -501,9 +499,9 @@ Return Value:
 			fcb->AdvancedFCBHeader.Flags2 &= ~FSRTL_FLAG2_SUPPORTS_FILTER_CONTEXTS;
 		}
 
-		ccb = DokanAllocateCCB(dcb, fcb);
+		ccb = FuserAllocateCCB(dcb, fcb);
 		if (ccb == NULL) {
-			DokanFreeFCB(fcb); // FileName is freed here
+			FuserFreeFCB(fcb); // FileName is freed here
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			__leave;
 		}
@@ -516,7 +514,7 @@ Return Value:
 
 		eventLength = sizeof(EVENT_CONTEXT) + fcb->FileName.Length;
 		eventContext = AllocateEventContext(vcb->Dcb, Irp, eventLength, ccb);
-				
+
 		if (eventContext == NULL) {
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			__leave;
@@ -535,7 +533,7 @@ Return Value:
 		eventContext->Create.ShareAccess    = irpSp->Parameters.Create.ShareAccess;
 
 		// register this IRP to waiting IPR list
-		status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
+		status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
 
 	} __finally {
 
@@ -543,10 +541,10 @@ Return Value:
 			Irp->IoStatus.Status = status;
 			Irp->IoStatus.Information = info;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			DokanPrintNTStatus(status);
+			FuserPrintNTStatus(status);
 		}
 
-		DDbgPrint("<== DokanCreate\n");
+		FDbgPrint("<== FuserCreate\n");
 		FsRtlExitFileSystem();
 	}
 
@@ -554,8 +552,9 @@ Return Value:
 }
 
 
+
 VOID
-DokanCompleteCreate(
+FuserCompleteCreate(
 	 __in PIRP_ENTRY			IrpEntry,
 	 __in PEVENT_INFORMATION	EventInfo
 	 )
@@ -564,13 +563,13 @@ DokanCompleteCreate(
 	PIO_STACK_LOCATION	irpSp;
 	NTSTATUS			status;
 	ULONG				info;
-	PDokanCCB			ccb;
-	PDokanFCB			fcb;
+	PFuserCCB			ccb;
+	PFuserFCB			fcb;
 
 	irp   = IrpEntry->Irp;
 	irpSp = IrpEntry->IrpSp;	
 
-	DDbgPrint("==> DokanCompleteCreate\n");
+	FDbgPrint("==> FuserCompleteCreate\n");
 
 	ccb	= IrpEntry->FileObject->FsContext2;
 	ASSERT(ccb != NULL);
@@ -578,74 +577,72 @@ DokanCompleteCreate(
 	fcb = ccb->Fcb;
 	ASSERT(fcb != NULL);
 
-	DDbgPrint("  FileName:%wZ\n", &fcb->FileName);
+	FDbgPrint("  FileName:%wZ\n", &fcb->FileName);
 
 	ccb->UserContext = EventInfo->Context;
-	//DDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
+	//FDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
 
 	status = EventInfo->Status;
 
 	info = EventInfo->Create.Information;
-
 	switch (info) {
 	case FILE_OPENED:
-		DDbgPrint("  FILE_OPENED\n");
+		FDbgPrint("  FILE_OPENED\n");
 		break;
 	case FILE_CREATED:
-		DDbgPrint("  FILE_CREATED\n");
+		FDbgPrint("  FILE_CREATED\n");
 		break;
 	case FILE_OVERWRITTEN:
-		DDbgPrint("  FILE_OVERWRITTEN\n");
+		FDbgPrint("  FILE_OVERWRITTEN\n");
 		break;
 	case FILE_DOES_NOT_EXIST:
-		DDbgPrint("  FILE_DOES_NOT_EXIST\n");
+		FDbgPrint("  FILE_DOES_NOT_EXIST\n");
 		break;
 	case FILE_EXISTS:
-		DDbgPrint("  FILE_EXISTS\n");
+		FDbgPrint("  FILE_EXISTS\n");
 		break;
 	default:
-		DDbgPrint("  info = %d\n", info);
+		FDbgPrint("  info = %d\n", info);
 		break;
 	}
 
 	ExAcquireResourceExclusiveLite(&fcb->Resource, TRUE);
 	if (NT_SUCCESS(status) &&
 		(irpSp->Parameters.Create.Options & FILE_DIRECTORY_FILE ||
-		EventInfo->Create.Flags & DOKAN_FILE_DIRECTORY)) {
+		EventInfo->Create.Flags & FUSER_FILE_DIRECTORY)) {
 		if (irpSp->Parameters.Create.Options & FILE_DIRECTORY_FILE) {
-			DDbgPrint("  FILE_DIRECTORY_FILE %p\n", fcb);
+			FDbgPrint("  FILE_DIRECTORY_FILE %p\n", fcb);
 		} else {
-			DDbgPrint("  DOKAN_FILE_DIRECTORY %p\n", fcb);
+			FDbgPrint("  FUSER_FILE_DIRECTORY %p\n", fcb);
 		}
-		fcb->Flags |= DOKAN_FILE_DIRECTORY;
+		fcb->Flags |= FUSER_FILE_DIRECTORY;
 	}
 	ExReleaseResourceLite(&fcb->Resource);
 
 	ExAcquireResourceExclusiveLite(&ccb->Resource, TRUE);
 	if (NT_SUCCESS(status)) {
-		ccb->Flags |= DOKAN_FILE_OPENED;
+		ccb->Flags |= FUSER_FILE_OPENED;
 	}
 	ExReleaseResourceLite(&ccb->Resource);
-
 	if (NT_SUCCESS(status)) {
 		if (info == FILE_CREATED) {
-			if (fcb->Flags & DOKAN_FILE_DIRECTORY) {
-				DokanNotifyReportChange(fcb, FILE_NOTIFY_CHANGE_DIR_NAME, FILE_ACTION_ADDED);
+			if (fcb->Flags & FUSER_FILE_DIRECTORY) {
+				FuserNotifyReportChange(fcb, FILE_NOTIFY_CHANGE_DIR_NAME, FILE_ACTION_ADDED); // notify everywhere when changes are made to the file system.
 			} else {
-				DokanNotifyReportChange(fcb, FILE_NOTIFY_CHANGE_FILE_NAME, FILE_ACTION_ADDED);
+				FuserNotifyReportChange(fcb, FILE_NOTIFY_CHANGE_FILE_NAME, FILE_ACTION_ADDED);
 			}
 		}
 	} else {
-		DDbgPrint("   IRP_MJ_CREATE failed. Free CCB:%X\n", ccb);
-		DokanFreeCCB(ccb);
-		DokanFreeFCB(fcb);
+		FDbgPrint("   IRP_MJ_CREATE failed. Free CCB:%X\n", ccb);
+		FuserFreeCCB(ccb);
+		FuserFreeFCB(fcb);
 	}
-	
+
 	irp->IoStatus.Status = status;
 	irp->IoStatus.Information = info;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DokanPrintNTStatus(status);
-	DDbgPrint("<== DokanCompleteCreate\n");
+	FuserPrintNTStatus(status);
+	FDbgPrint("<== FuserCompleteCreate\n");
 }
 

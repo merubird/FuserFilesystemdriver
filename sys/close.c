@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,12 +18,15 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokan.h"
+#include "fuser.h"
+
+
+
 
 
 
 NTSTATUS
-DokanDispatchClose(
+FuserDispatchClose(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
@@ -46,39 +48,37 @@ Return Value:
 
 --*/
 {
-	PDokanVCB			vcb;
+	PFuserVCB			vcb;
 	PIO_STACK_LOCATION	irpSp;
 	NTSTATUS			status = STATUS_INVALID_PARAMETER;
 	PFILE_OBJECT		fileObject;
-	PDokanCCB			ccb;
+	PFuserCCB			ccb;
 	PEVENT_CONTEXT		eventContext;
 	ULONG				eventLength;
-	PDokanFCB			fcb;
+	PFuserFCB			fcb;
 
 	PAGED_CODE();
-
 	__try {
-
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanClose\n");
+		FDbgPrint("==> FuserClose\n");
 	
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 		fileObject = irpSp->FileObject;
 
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject is NULL\n");
+			FDbgPrint("  fileObject is NULL\n");
 			status = STATUS_SUCCESS;
 			__leave;
 		}
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DokanPrintFileName(fileObject);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FuserPrintFileName(fileObject);
 
 		vcb = DeviceObject->DeviceExtension;
 
 		if (GetIdentifierType(vcb) != VCB ||
-			!DokanCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
+			!FuserCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
 
 			if (fileObject->FsContext2) {
 				ccb = fileObject->FsContext2;
@@ -87,10 +87,10 @@ Return Value:
 				fcb = ccb->Fcb;
 				ASSERT(fcb != NULL);
 
-				DDbgPrint("   Free CCB:%X\n", ccb);
-				DokanFreeCCB(ccb);
+				FDbgPrint("   Free CCB:%X\n", ccb);
+				FuserFreeCCB(ccb);
 
-				DokanFreeFCB(fcb);
+				FuserFreeFCB(fcb);
 			}
 
 			status = STATUS_SUCCESS;
@@ -108,32 +108,32 @@ Return Value:
 
 		if (eventContext == NULL) {
 			//status = STATUS_INSUFFICIENT_RESOURCES;
-			DDbgPrint("   eventContext == NULL\n");
-			DDbgPrint("   Free CCB:%X\n", ccb);
-			DokanFreeCCB(ccb);
-			DokanFreeFCB(fcb);
+			FDbgPrint("   eventContext == NULL\n");
+			FDbgPrint("   Free CCB:%X\n", ccb);
+			FuserFreeCCB(ccb);
+			FuserFreeFCB(fcb);
 			status = STATUS_SUCCESS;
 			__leave;
 		}
 
 		eventContext->Context = ccb->UserContext;
-		DDbgPrint("   UserContext:%X\n", (ULONG)ccb->UserContext);
+		FDbgPrint("   UserContext:%X\n", (ULONG)ccb->UserContext);
 
 		// copy the file name to be closed
 		eventContext->Close.FileNameLength = fcb->FileName.Length;
 		RtlCopyMemory(eventContext->Close.FileName, fcb->FileName.Buffer, fcb->FileName.Length);
 
-		DDbgPrint("   Free CCB:%X\n", ccb);
-		DokanFreeCCB(ccb);
+		FDbgPrint("   Free CCB:%X\n", ccb);
+		FuserFreeCCB(ccb);
 
-		DokanFreeFCB(fcb);
+		FuserFreeFCB(fcb);
 
 		// Close can not be pending status
 		// don't register this IRP
-		//status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext->SerialNumber, 0);
+		//status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext->SerialNumber, 0);
 
 		// inform it to user-mode
-		DokanEventNotification(&vcb->Dcb->NotifyEvent, eventContext);
+		FuserEventNotification(&vcb->Dcb->NotifyEvent, eventContext);
 
 		status = STATUS_SUCCESS;
 
@@ -145,7 +145,7 @@ Return Value:
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
 		}
 
-		DDbgPrint("<== DokanClose\n");
+		FDbgPrint("<== FuserClose\n");
 
 		FsRtlExitFileSystem();
 	}

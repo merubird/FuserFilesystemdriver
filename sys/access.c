@@ -1,9 +1,8 @@
 /*
   Dokan : user-mode file system library for Windows
 
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
   Copyright (C) 2010 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,10 +17,13 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "dokan.h"
+#include "fuser.h"
+
+
+
 
 NTSTATUS
-DokanGetAccessToken(
+FuserGetAccessToken(
    __in PDEVICE_OBJECT	DeviceObject,
    __in PIRP			Irp
    )
@@ -29,7 +31,7 @@ DokanGetAccessToken(
 	KIRQL				oldIrql;
     PLIST_ENTRY			thisEntry, nextEntry, listHead;
 	PIRP_ENTRY			irpEntry;
-	PDokanVCB			vcb;
+	PFuserVCB			vcb;
 	PEVENT_INFORMATION	eventInfo;
 	PACCESS_TOKEN		accessToken;
 	NTSTATUS			status = STATUS_INVALID_PARAMETER;
@@ -40,21 +42,21 @@ DokanGetAccessToken(
 	ULONG				inBufferLen;
 	PACCESS_STATE		accessState;
 
-	DDbgPrint("==> DokanGetAccessToken\n");
+	FDbgPrint("==> FuserGetAccessToken\n");
 
 	__try {
 		eventInfo		= (PEVENT_INFORMATION)Irp->AssociatedIrp.SystemBuffer;
 		ASSERT(eventInfo != NULL);
 
 		if (Irp->RequestorMode != UserMode) {
-			DDbgPrint("  needs to be called from user-mode\n");
+			FDbgPrint("  needs to be called from user-mode\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
 		vcb = DeviceObject->DeviceExtension;
 		if (GetIdentifierType(vcb) != VCB) {
-			DDbgPrint("  GetIdentifierType != VCB\n");
+			FDbgPrint("  GetIdentifierType != VCB\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
@@ -64,7 +66,7 @@ DokanGetAccessToken(
 		inBufferLen = irpSp->Parameters.DeviceIoControl.InputBufferLength;
 		if (outBufferLen != sizeof(EVENT_INFORMATION) ||
 			inBufferLen != sizeof(EVENT_INFORMATION)) {
-			DDbgPrint("  wrong input or output buffer length\n");
+			FDbgPrint("  wrong input or output buffer length\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
@@ -91,38 +93,40 @@ DokanGetAccessToken(
 				accessState = irpEntry->IrpSp->Parameters.Create.SecurityContext->AccessState;
 			}
 			break;
+
 		}
 		KeReleaseSpinLock(&vcb->Dcb->PendingIrp.ListLock, oldIrql);
 		hasLock = FALSE;
 
 		if (accessState == NULL) {
-			DDbgPrint("  can't find pending Irp: %d\n", eventInfo->SerialNumber);
+			FDbgPrint("  can't find pending Irp: %d\n", eventInfo->SerialNumber);
 			__leave;
 		}
 
 		accessToken = SeQuerySubjectContextToken(&accessState->SubjectSecurityContext);
 		if (accessToken == NULL) {
-			DDbgPrint("  accessToken == NULL\n");
+			FDbgPrint("  accessToken == NULL\n");
 			__leave;
 		}
+
 		// NOTE: Accessing *SeTokenObjectType while acquring sping lock causes
 		// BSOD on Windows XP.
 		status = ObOpenObjectByPointer(accessToken, 0, NULL, GENERIC_ALL,
 			*SeTokenObjectType, KernelMode, &handle);
 		if (!NT_SUCCESS(status)) {
-			DDbgPrint("  ObOpenObjectByPointer failed: 0x%x\n", status);
+			FDbgPrint("  ObOpenObjectByPointer failed: 0x%x\n", status);
 			__leave;
 		}
 
 		eventInfo->AccessToken.Handle = handle;
 		Irp->IoStatus.Information = sizeof(EVENT_INFORMATION);
 		status = STATUS_SUCCESS;
-
 	} __finally {
 		if (hasLock) {
 			KeReleaseSpinLock(&vcb->Dcb->PendingIrp.ListLock, oldIrql);
 		}
 	}
-	DDbgPrint("<== DokanGetAccessToken\n");
+	FDbgPrint("<== FuserGetAccessToken\n");
+
 	return status;
 }

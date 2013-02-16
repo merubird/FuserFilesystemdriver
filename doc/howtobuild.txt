@@ -1,5 +1,5 @@
 
-How to build Dokan library
+How to build Fuser library
 
 
 ** Build Envrionment
@@ -11,60 +11,60 @@ https://connect.microsoft.com
 
 ** Build
 
-When you unzip the dokan source codes, you can get the following folders.
+When you unzip the fuser source codes, you can get the following folders.
 
-    * \dokan (user-mode library dokan.dll)
-    * \dokan_control (control program dokanctl.exe)
-    * \dokan_mirror (sample program)
-    * \dokan_mount (mount service mounter.exe)
-    * \sys (driver dokan.sys) 
+    * \fuser (user-mode library fuser.dll)
+    * \fuser_control (control program fuserctl.exe)
+    * \fuser_mirror (sample program)
+    * \fuser_mount (mount service mounter.exe)
+    * \sys (driver fuser.sys) 
 
-After installing WDK, launch the build environment from the Start menu. Change the directory to dokan source code.
-Run Ågbuild /wcbgÅh command within each folders.
+After installing WDK, launch the build environment from the Start menu. Change the directory to fuser source code.
+Run "build /wcbg" command within each folders.
 
 
 ** Embed a manifest in programs
 
-You may need to embed a manifest in dokanctrl.exe when you use Vista or Windows7. 
-In that case, please run the following command within \dokan_mirror and \dokan_control directory.
-"{PATH_TO_MT}\mt.exe" -manifest "dokanctl.exe.manifest"  -outputresource:"objchk_wlh_amd64\amd64\dokanctl.exe"
+You may need to embed a manifest in fuserctrl.exe when you use Vista or Windows7. 
+In that case, please run the following command within \fuser_mirror and \fuser_control directory.
+"{PATH_TO_MT}\mt.exe" -manifest "fuserctl.exe.manifest"  -outputresource:"objchk_wlh_amd64\amd64\fuserctl.exe"
 Please replace the target names besed on your environment.
 
 
 ** Install Driver
 
-Now you can get binary programs for example under Åg\dokan\objchk_wlh_x86\i386Åç.
-You need dokan.dll dokan.sys dokanctl.exe mounter.exe mirror.exe
+Now you can get binary programs for example under "\fuser\objchk_wlh_x86\i386".
+You need fuser.dll fuser.sys fuserctl.exe mounter.exe mirror.exe
 
-Copy dokan.sys under \Windows\system32\drivers
-Copy dokan.dll under \Windows\system32
-Place dokanctl.exe and mounter.exe in the same folder.
+Copy fuser.sys under \Windows\system32\drivers
+Copy fuser.dll under \Windows\system32
+Place fuserctl.exe and mounter.exe in the same folder.
 
-Run Ågdokanctl.exe /i aÅh This means register the driver and the service to Windows.
+Run "fuserctl.exe /i a" This means register the driver and the service to Windows.
 You can also do them separately.
-Ågdokanctl.exe /i dÅh Install driver.
-Ågdokanctl.exe /i sÅh install service.
+"fuserctl.exe /i d" Install driver.
+"fuserctl.exe /i s" install service.
 
 If you update your driver, you MUST restart your computer after uninstalling previous version.
 
 
 ** Test the driver
 
-You can get version information when you run Ågdokanctl.exe /vÅh.
+You can get version information when you run "fuserctl.exe /v".
 
 
 ** Sample program
 
-Run Ågmirror.exe /r c:\ /l mÅh. This means mirror C driver under M driver. Can you see M driver?
-To unmount M driver, run Ågdokanctl.exe /u mÅh
+Run "mirror.exe /r c:\ /l m". This means mirror C driver under M driver. Can you see M driver?
+To unmount M driver, run "fuserctl.exe /u m"
 You can see all options of mirror.exe by running mirror.exe without argument.
 
 
 ** Uninstall Driver
 
-Ågdokanctl.exe /r aÅh Uninstall both driver and service.
-Ågdokanctl.exe /r dÅh Uninstall driver.
-Ågdokanctl.exe /r sÅh Uninstall service.
+"fuserctl.exe /r a" Uninstall both driver and service.
+"fuserctl.exe /r d" Uninstall driver.
+"fuserctl.exe /r s" Uninstall service.
 You should restart your computer after uninstalling driver.
 
 
@@ -77,10 +77,10 @@ http://www.citadelindustries.net/readydriverplus/
 
 ** Network filesystem/provider support
 
-Dokan supports network filesystem mode. You need dokan network provider dll in \dokan_np.
-Please build it and copy dokannp.dll into Windows\system32 directly.
-You need to register network provider dll to system : dokanctl.exe /i n 
-(Unregister network provider : dokanctl.exe /r n) 
+Fuser supports network filesystem mode. You need fuser network provider dll in \fuser_np.
+Please build it and copy fusernp.dll into Windows\system32 directly.
+You need to register network provider dll to system : fuserctl.exe /i n 
+(Unregister network provider : fuserctl.exe /r n) 
 You probably need to restart your computer after register or unregister network provider.
 And try "mirror.exe /r root_path /l drive_letter /n". 
 /n option means to mount as network drive 

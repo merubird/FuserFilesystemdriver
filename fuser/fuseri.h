@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,17 +17,16 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#ifndef _DOKANI_H_
-#define _DOKANI_H_
+#ifndef _FUSERI_H_
+#define _FUSERI_H_
 
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "devioctl.h"
 #include "public.h"
-#include "dokan.h"
-#include "dokanc.h"
+#include "fuser.h"
+#include "fuserc.h"
 #include "list.h"
 
 #ifdef __cplusplus
@@ -37,7 +35,8 @@ extern "C" {
 
 
 
-typedef struct _DOKAN_INSTANCE {
+
+typedef struct _FUSER_INSTANCE {
 	// to ensure that unmount dispatch is called at once
 	CRITICAL_SECTION	CriticalSection;
 
@@ -50,27 +49,30 @@ typedef struct _DOKAN_INSTANCE {
 	ULONG	DeviceNumber;
 	ULONG	MountId;
 
-	PDOKAN_OPTIONS		DokanOptions;
-	PDOKAN_OPERATIONS	DokanOperations;
-
+	PFUSER_OPTIONS		FuserOptions;
+	PFUSER_OPERATIONS	FuserOperations;
 	LIST_ENTRY	ListEntry;
-} DOKAN_INSTANCE, *PDOKAN_INSTANCE;
+
+} FUSER_INSTANCE, *PFUSER_INSTANCE;
 
 
-typedef struct _DOKAN_OPEN_INFO {
+typedef struct _FUSER_OPEN_INFO {
 	BOOL			IsDirectory;
 	ULONG			OpenCount;
 	PEVENT_CONTEXT	EventContext;
-	PDOKAN_INSTANCE	DokanInstance;
+	PFUSER_INSTANCE	FuserInstance;
 	ULONG64			UserContext;
 	ULONG			EventId;
 	PLIST_ENTRY		DirListHead;
-} DOKAN_OPEN_INFO, *PDOKAN_OPEN_INFO;
+} FUSER_OPEN_INFO, *PFUSER_OPEN_INFO;
+
 
 
 BOOL
-DokanStart(
-	PDOKAN_INSTANCE	Instance);
+SendReleaseIRP(
+	LPCWSTR DeviceName);
+
+
 
 BOOL
 SendToDevice(
@@ -82,200 +84,214 @@ SendToDevice(
 	ULONG	OutputLength,
 	PULONG	ReturnedLength);
 
+	
+
+
 LPCWSTR
 GetRawDeviceName(LPCWSTR	DeviceName);
 
-DWORD __stdcall
-DokanLoop(
-	PVOID Param);
 
 
 BOOL
-DokanMount(
+FuserMount(
 	LPCWSTR	MountPoint,
 	LPCWSTR	DeviceName);
 
-VOID
-SendEventInformation(
-	HANDLE				Handle,
-	PEVENT_INFORMATION	EventInfo,
-	ULONG				EventLength,
-	PDOKAN_INSTANCE		DokanInstance);
 
+DWORD WINAPI
+FuserKeepAlive(
+	PVOID	Param);	
+	
 
-PEVENT_INFORMATION
-DispatchCommon(
-	PEVENT_CONTEXT		EventContext,
-	ULONG				SizeOfEventInfo,
-	PDOKAN_INSTANCE		DokanInstance,
-	PDOKAN_FILE_INFO	DokanFileInfo,
-	PDOKAN_OPEN_INFO*	DokanOpenInfo);
-
-
-VOID
-DispatchDirectoryInformation(
-	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchQueryInformation(
- 	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchQueryVolumeInformation(
- 	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchSetInformation(
- 	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchRead(
- 	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchWrite(
- 	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchCreate(
-	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchClose(
-  	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchCleanup(
-  	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-VOID
-DispatchFlush(
-  	HANDLE				Handle,
-	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
 
 
 VOID
 DispatchUnmount(
   	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+DispatchCreate(
+	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);	
+	
+
+
+VOID
+CheckFileName(
+	LPWSTR	FileName);
+	
+
+
+VOID
+SendEventInformation(
+	HANDLE				Handle,
+	PEVENT_INFORMATION	EventInfo,
+	ULONG				EventLength,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+
+VOID
+ClearFindData(
+  PLIST_ENTRY	ListHead);
+
+
+
+  
+VOID
+DispatchQueryInformation(
+ 	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+PEVENT_INFORMATION
+DispatchCommon(
+	PEVENT_CONTEXT		EventContext,
+	ULONG				SizeOfEventInfo,
+	PFUSER_INSTANCE		FuserInstance,
+	PFUSER_FILE_INFO	FuserFileInfo,
+	PFUSER_OPEN_INFO*	FuserOpenInfo);
+
+
+
+VOID
+DispatchQueryVolumeInformation(
+ 	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+DispatchCleanup(
+  	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
+	
+
+
+VOID
+DispatchClose(
+  	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+ReleaseFuserOpenInfo(
+	PEVENT_INFORMATION	EventInfomation,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+DispatchDirectoryInformation(
+	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+DispatchRead(
+ 	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+DispatchWrite(
+ 	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);	
 
 
 VOID
 DispatchLock(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
+	PFUSER_INSTANCE		FuserInstance);
+
+
+VOID
+DispatchSetInformation(
+ 	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+	
+
+
+ULONG
+GetNTStatus(DWORD ErrorCode);	
+
+
+
+VOID
+DispatchFlush(
+  	HANDLE				Handle,
+	PEVENT_CONTEXT		EventContext,
+	PFUSER_INSTANCE		FuserInstance);
+
 
 
 VOID
 DispatchQuerySecurity(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
+	PFUSER_INSTANCE		FuserInstance);	
+	
 VOID
 DispatchSetSecurity(
 	HANDLE			Handle,
 	PEVENT_CONTEXT	EventContext,
-	PDOKAN_INSTANCE	DokanInstance);
+	PFUSER_INSTANCE	FuserInstance);
+	
+
+#ifdef __cplusplus
+}
+#endif	
+	
+
+#endif
 
 
+
+
+/* TODO: obsolete and unused, can be removed
+BOOL
+FuserStart(
+	PFUSER_INSTANCE	Instance);
+DWORD __stdcall
+FuserLoop(
+	PVOID Param);
 BOOLEAN
 InstallDriver(
 	SC_HANDLE  SchSCManager,
 	LPCWSTR    DriverName,
 	LPCWSTR    ServiceExe);
-
-
 BOOLEAN
 RemoveDriver(
     SC_HANDLE  SchSCManager,
     LPCWSTR    DriverName);
-
-
 BOOLEAN
 StartDriver(
     SC_HANDLE  SchSCManager,
     LPCWSTR    DriverName);
-
-
 BOOLEAN
 StopDriver(
     SC_HANDLE  SchSCManager,
     LPCWSTR    DriverName);
-
-
 BOOLEAN
 ManageDriver(
 	LPCWSTR  DriverName,
     LPCWSTR  ServiceName,
     USHORT   Function);
-
-
-BOOL
-SendReleaseIRP(
-	LPCWSTR DeviceName);
-
-VOID
-CheckFileName(
-	LPWSTR	FileName);
-
-VOID
-ClearFindData(
-  PLIST_ENTRY	ListHead);
-
-DWORD WINAPI
-DokanKeepAlive(
-	PVOID	Param);
-
-
-ULONG
-GetNTStatus(DWORD ErrorCode);
-
-PDOKAN_OPEN_INFO
-GetDokanOpenInfo(
+PFUSER_OPEN_INFO
+GetFuserOpenInfo(
 	PEVENT_CONTEXT		EventInfomation,
-	PDOKAN_INSTANCE		DokanInstance);
+	PFUSER_INSTANCE		FuserInstance);
+*/
 
-VOID
-ReleaseDokanOpenInfo(
-	PEVENT_INFORMATION	EventInfomation,
-	PDOKAN_INSTANCE		DokanInstance);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-
-#endif

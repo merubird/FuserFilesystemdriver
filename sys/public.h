@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -17,79 +16,78 @@ FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
-
-
 #ifndef _PUBLIC_H_
 #define _PUBLIC_H_
 
-#include "devioctl.h"
-
-#define DOKAN_DRIVER_VERSION	0x0000190
-
-#define EVENT_CONTEXT_MAX_SIZE		(1024*32)
-
-#define IOCTL_TEST \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_SET_DEBUG_MODE \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_EVENT_WAIT \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x802, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_EVENT_INFO \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x803, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_EVENT_RELEASE \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x804, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_EVENT_START \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x805, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_EVENT_WRITE \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x806, METHOD_OUT_DIRECT, FILE_ANY_ACCESS)
-
-#define IOCTL_KEEPALIVE \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x809, METHOD_NEITHER, FILE_ANY_ACCESS)
-
-#define IOCTL_SERVICE_WAIT \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80A, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_RESET_TIMEOUT \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80B, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_GET_ACCESS_TOKEN \
-	CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80C, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 
+// TODO: Remove this
+/*
+#include "devioctl.h" // TODO: move to right project
 #define DRIVER_FUNC_INSTALL     0x01
 #define DRIVER_FUNC_REMOVE      0x02
-
-#define DOKAN_MOUNTED		1
-#define DOKAN_USED			2
-#define DOKAN_START_FAILED	3
-
-#define DOKAN_DEVICE_MAX	10
-
-#define DOKAN_SECTOR_SIZE			512
-#define DOKAN_ALLOCATION_UNIT_SIZE	512
+#define FUSER_USED			2
+#define FUSER_DEVICE_MAX	10
+#define FUSER_FILE_DELETED		2
+#define WRITE_MAX_SIZE				(EVENT_CONTEXT_MAX_SIZE-sizeof(EVENT_CONTEXT)-256*sizeof(WCHAR))
 
 
-// used in CCB->Flags and FCB->Flags
-#define DOKAN_FILE_DIRECTORY	1
-#define DOKAN_FILE_DELETED		2
-#define DOKAN_FILE_OPENED		4
-#define DOKAN_DIR_MATCH_ALL		8
-#define DOKAN_DELETE_ON_CLOSE	16
-#define DOKAN_PAGING_IO			32
-#define DOKAN_SYNCHRONOUS_IO	64
-#define DOKAN_WRITE_TO_END_OF_FILE 128
-#define DOKAN_NOCACHE			256
+//typedef struct _FUSER_LINK_INFORMATION {
+//	BOOLEAN ReplaceIfExists;
+//	ULONG FileNameLength;
+//	WCHAR FileName[1];
+//} FUSER_LINK_INFORMATION, *PFUSER_LINK_INFORMATION;
+*/
 
 
-// used in DOKAN_START->DeviceType
-#define DOKAN_DISK_FILE_SYSTEM		0
-#define DOKAN_NETWORK_FILE_SYSTEM	1
+
+#define FUSER_DRIVER_VERSION	  0x0000190   // TODO: change value
+
+#define EVENT_CONTEXT_MAX_SIZE    (1024*32)
+
+#define IOCTL_TEST                CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_SET_DEBUG_MODE      CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_EVENT_WAIT          CTL_CODE(FILE_DEVICE_UNKNOWN, 0x802, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_EVENT_INFO          CTL_CODE(FILE_DEVICE_UNKNOWN, 0x803, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_EVENT_RELEASE       CTL_CODE(FILE_DEVICE_UNKNOWN, 0x804, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_EVENT_START         CTL_CODE(FILE_DEVICE_UNKNOWN, 0x805, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_EVENT_WRITE         CTL_CODE(FILE_DEVICE_UNKNOWN, 0x806, METHOD_OUT_DIRECT, FILE_ANY_ACCESS)
+#define IOCTL_KEEPALIVE           CTL_CODE(FILE_DEVICE_UNKNOWN, 0x809, METHOD_NEITHER,    FILE_ANY_ACCESS)
+#define IOCTL_SERVICE_WAIT        CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80A, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_RESET_TIMEOUT       CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80B, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_GET_ACCESS_TOKEN    CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80C, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+
+
+// TOCO: change names, unify
+#define FUSER_MOUNTED		1
+#define FUSER_START_FAILED	3
+
+// Drive Geometrie Data:
+#define FUSER_SECTOR_SIZE			512
+#define FUSER_ALLOCATION_UNIT_SIZE	512 // used with fuser.dll, volume.c to calculate size
+
+
+// used in FUSER_START->DeviceType
+#define FUSER_DISK_FILE_SYSTEM		0
+#define FUSER_NETWORK_FILE_SYSTEM	1 // TODO: remove support
+
+#define FUSER_EVENT_ALTERNATIVE_STREAM_ON	1
+#define FUSER_EVENT_KEEP_ALIVE_ON			2
+#define FUSER_EVENT_REMOVABLE				4
+
+
+
+// used in CCB->Flags and FCB->Flags   // TODO: revise names, all occur in createmethods and others
+#define FUSER_FILE_DIRECTORY			1
+#define FUSER_FILE_OPENED				4
+#define FUSER_DIR_MATCH_ALL				8
+#define FUSER_DELETE_ON_CLOSE			16
+#define FUSER_PAGING_IO					32
+#define FUSER_SYNCHRONOUS_IO			64
+#define FUSER_WRITE_TO_END_OF_FILE 		128
+#define FUSER_NOCACHE					256
+
+// Context-Struct
 
 typedef struct _CREATE_CONTEXT {
 	ULONG	FileAttributes;
@@ -116,7 +114,6 @@ typedef struct _CLOSE_CONTEXT {
 
 } CLOSE_CONTEXT, *PCLOSE_CONTEXT;
 
-
 typedef struct _DIRECTORY_CONTEXT {
 	ULONG	FileInformationClass;
 	ULONG	FileIndex;
@@ -128,7 +125,6 @@ typedef struct _DIRECTORY_CONTEXT {
 	WCHAR	SearchPatternBase[1];
 
 } DIRECTORY_CONTEXT, *PDIRECTORY_CONTEXT;
-
 
 typedef struct _READ_CONTEXT {
 	LARGE_INTEGER	ByteOffset;
@@ -165,12 +161,10 @@ typedef struct _SETFILE_CONTEXT {
 	WCHAR	FileName[1];
 } SETFILE_CONTEXT, *PSETFILE_CONTEXT;
 
-
 typedef struct _VOLUME_CONTEXT {
 	ULONG	FsInformationClass;
 	ULONG	BufferLength;
 } VOLUME_CONTEXT, *PVOLUME_CONTEXT;
-
 
 typedef struct _LOCK_CONTEXT {
 	LARGE_INTEGER	ByteOffset;
@@ -227,7 +221,7 @@ typedef struct _EVENT_CONTEXT {
 		CREATE_CONTEXT		Create;
 		CLOSE_CONTEXT		Close;
 		SETFILE_CONTEXT		SetFile;
-		CLEANUP_CONTEXT		Cleanup;
+		CLEANUP_CONTEXT		Cleanup;					
 		LOCK_CONTEXT		Lock;
 		VOLUME_CONTEXT		Volume;
 		FLUSH_CONTEXT		Flush;
@@ -236,9 +230,6 @@ typedef struct _EVENT_CONTEXT {
 		SET_SECURITY_CONTEXT	SetSecurity;
 	};
 } EVENT_CONTEXT, *PEVENT_CONTEXT;
-
-
-#define WRITE_MAX_SIZE				(EVENT_CONTEXT_MAX_SIZE-sizeof(EVENT_CONTEXT)-256*sizeof(WCHAR))
 
 
 typedef struct _EVENT_INFORMATION {
@@ -276,10 +267,6 @@ typedef struct _EVENT_INFORMATION {
 } EVENT_INFORMATION, *PEVENT_INFORMATION;
 
 
-#define DOKAN_EVENT_ALTERNATIVE_STREAM_ON	1
-#define DOKAN_EVENT_KEEP_ALIVE_ON			2
-#define DOKAN_EVENT_REMOVABLE				4
-
 typedef struct _EVENT_DRIVER_INFO {
 	ULONG	DriverVersion;
 	ULONG	Status;
@@ -295,17 +282,12 @@ typedef struct _EVENT_START {
 	WCHAR	DriveLetter;
 } EVENT_START, *PEVENT_START;
 
-typedef struct _DOKAN_RENAME_INFORMATION {
-	BOOLEAN ReplaceIfExists;
-	ULONG FileNameLength;
-	WCHAR FileName[1];
-} DOKAN_RENAME_INFORMATION, *PDOKAN_RENAME_INFORMATION;
 
-typedef struct _DOKAN_LINK_INFORMATION {
+typedef struct _FUSER_RENAME_INFORMATION {
 	BOOLEAN ReplaceIfExists;
 	ULONG FileNameLength;
 	WCHAR FileName[1];
-} DOKAN_LINK_INFORMATION, *PDOKAN_LINK_INFORMATION;
+} FUSER_RENAME_INFORMATION, *PFUSER_RENAME_INFORMATION;
+
 
 #endif // _PUBLIC_H_
-

@@ -1,9 +1,8 @@
-/*			
-  Dokan : user-mode file system library for Windows
+/*
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,25 +18,15 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 
-
-int DokanGetDiskFreeSpace(
-	PULONGLONG			FreeBytesAvailable,
-	PULONGLONG			TotalNumberOfBytes,
-	PULONGLONG			TotalNumberOfFreeBytes,
-	PDOKAN_FILE_INFO	DokanFileInfo)
-{
-	*FreeBytesAvailable = 512*1024*1024;
-	*TotalNumberOfBytes = 1024*1024*1024;
-	*TotalNumberOfFreeBytes = 512*1024*1024;
-	
-	return 0;
-}
+#define FUSER_DEFAULT_VOLUME_LABEL			L"FUSER"
+#define FUSER_DEFAULT_SERIALNUMBER			0x19831116;
 
 
-int DokanGetVolumeInformation(
+
+int FuserGetVolumeInformation(
 	LPWSTR		VolumeNameBuffer,
 	DWORD		VolumeNameSize,
 	LPDWORD		VolumeSerialNumber,
@@ -45,29 +34,30 @@ int DokanGetVolumeInformation(
 	LPDWORD		FileSystemFlags,
 	LPWSTR		FileSystemNameBuffer,
 	DWORD		FileSystemNameSize,
-	PDOKAN_FILE_INFO	DokanFileInfo)
+	PFUSER_FILE_INFO	FuserFileInfo)
 {
-	wcscpy_s(VolumeNameBuffer, VolumeNameSize / sizeof(WCHAR), L"DOKAN");
-	*VolumeSerialNumber = 0x19831116;
+	wcscpy_s(VolumeNameBuffer, VolumeNameSize / sizeof(WCHAR), L"FUSER");
+	*VolumeSerialNumber = FUSER_DEFAULT_SERIALNUMBER;
 	*MaximumComponentLength = 256;
 	*FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
 						FILE_CASE_PRESERVED_NAMES | 
 						FILE_SUPPORTS_REMOTE_STORAGE |
 						FILE_UNICODE_ON_DISK;
 
-	wcscpy_s(FileSystemNameBuffer, FileSystemNameSize / sizeof(WCHAR), L"Dokan");
+	wcscpy_s(FileSystemNameBuffer, FileSystemNameSize / sizeof(WCHAR), L"Fuser");
 
 	return 0;
 }
 
 
 
+
 ULONG
-DokanFsVolumeInformation(
+FuserFsVolumeInformation(
 	PEVENT_INFORMATION	EventInfo,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_FILE_INFO	FileInfo,
-	PDOKAN_OPERATIONS	DokanOperations)
+	PFUSER_FILE_INFO	FileInfo,
+	PFUSER_OPERATIONS	FuserOperations)
 {
 	WCHAR	volumeName[MAX_PATH];
 	DWORD	volumeSerial;
@@ -83,9 +73,9 @@ DokanFsVolumeInformation(
 		(PFILE_FS_VOLUME_INFORMATION)EventInfo->Buffer;
 
 	
-	if (!DokanOperations->GetVolumeInformation) {
+	if (!FuserOperations->GetVolumeInformation) {
 		//return STATUS_NOT_IMPLEMENTED;
-		DokanOperations->GetVolumeInformation = DokanGetVolumeInformation;
+		FuserOperations->GetVolumeInformation = FuserGetVolumeInformation;
 	}
 
 	remainingLength = EventContext->Volume.BufferLength;
@@ -98,7 +88,7 @@ DokanFsVolumeInformation(
 	RtlZeroMemory(volumeName, sizeof(volumeName));
 	RtlZeroMemory(fsName, sizeof(fsName));
 
-	status = DokanOperations->GetVolumeInformation(
+	status = FuserOperations->GetVolumeInformation(
 				volumeName,							// VolumeNameBuffer
 				sizeof(volumeName) / sizeof(WCHAR), // VolumeNameSize
 				&volumeSerial,						// VolumeSerialNumber
@@ -107,7 +97,6 @@ DokanFsVolumeInformation(
 				fsName,								// FileSystemNameBuffer
 				sizeof(fsName)  / sizeof(WCHAR),	// FileSystemNameSize
 				FileInfo);
-
 	if (status < 0) {
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -116,7 +105,7 @@ DokanFsVolumeInformation(
 	volumeInfo->VolumeCreationTime.QuadPart = 0;
 	volumeInfo->VolumeSerialNumber = volumeSerial;
 	volumeInfo->SupportsObjects = FALSE;
-	
+
 	remainingLength -= FIELD_OFFSET(FILE_FS_VOLUME_INFORMATION, VolumeLabel[0]);
 	
 	bytesToCopy = wcslen(volumeName) * sizeof(WCHAR);
@@ -129,17 +118,33 @@ DokanFsVolumeInformation(
 	remainingLength -= bytesToCopy;
 
 	EventInfo->BufferLength = EventContext->Volume.BufferLength - remainingLength;
-	
+
 	return STATUS_SUCCESS;
 }
 
 
+int FuserGetDiskFreeSpace(
+	PULONGLONG			FreeBytesAvailable,
+	PULONGLONG			TotalNumberOfBytes,
+	PULONGLONG			TotalNumberOfFreeBytes,
+	PFUSER_FILE_INFO	FuserFileInfo)
+{
+	*FreeBytesAvailable = 512*1024*1024;
+	*TotalNumberOfBytes = 1024*1024*1024;
+	*TotalNumberOfFreeBytes = 512*1024*1024;
+	
+	return 0;
+}
+
+
+
+
 ULONG
-DokanFsSizeInformation(
+FuserFsSizeInformation(
 	PEVENT_INFORMATION	EventInfo,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_FILE_INFO	FileInfo,
-	PDOKAN_OPERATIONS	DokanOperations)
+	PFUSER_FILE_INFO	FileInfo,
+	PFUSER_OPERATIONS	FuserOperations)
 {
 	ULONGLONG	freeBytesAvailable = 0;
 	ULONGLONG	totalBytes = 0;
@@ -150,16 +155,16 @@ DokanFsSizeInformation(
 	PFILE_FS_SIZE_INFORMATION sizeInfo = (PFILE_FS_SIZE_INFORMATION)EventInfo->Buffer;
 
 	
-	if (!DokanOperations->GetDiskFreeSpace) {
+	if (!FuserOperations->GetDiskFreeSpace) {
 		//return STATUS_NOT_IMPLEMENTED;
-		DokanOperations->GetDiskFreeSpace = DokanGetDiskFreeSpace;
+		FuserOperations->GetDiskFreeSpace = FuserGetDiskFreeSpace;
 	}
 
 	if (EventContext->Volume.BufferLength < sizeof(FILE_FS_SIZE_INFORMATION) ) {
 		return STATUS_BUFFER_OVERFLOW;
 	}
 
-	status = DokanOperations->GetDiskFreeSpace(
+	status = FuserOperations->GetDiskFreeSpace(
 		&freeBytesAvailable, // FreeBytesAvailable
 		&totalBytes, // TotalNumberOfBytes
 		&freeBytes, // TotalNumberOfFreeBytes
@@ -169,10 +174,10 @@ DokanFsSizeInformation(
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	sizeInfo->TotalAllocationUnits.QuadPart		= totalBytes / DOKAN_ALLOCATION_UNIT_SIZE;
-	sizeInfo->AvailableAllocationUnits.QuadPart	= freeBytesAvailable / DOKAN_ALLOCATION_UNIT_SIZE;
-	sizeInfo->SectorsPerAllocationUnit			= DOKAN_ALLOCATION_UNIT_SIZE / DOKAN_SECTOR_SIZE;
-	sizeInfo->BytesPerSector					= DOKAN_SECTOR_SIZE;
+	sizeInfo->TotalAllocationUnits.QuadPart		= totalBytes / FUSER_ALLOCATION_UNIT_SIZE;
+	sizeInfo->AvailableAllocationUnits.QuadPart	= freeBytesAvailable / FUSER_ALLOCATION_UNIT_SIZE;
+	sizeInfo->SectorsPerAllocationUnit			= FUSER_ALLOCATION_UNIT_SIZE / FUSER_SECTOR_SIZE;
+	sizeInfo->BytesPerSector					= FUSER_SECTOR_SIZE;
 
 	EventInfo->BufferLength = sizeof(FILE_FS_SIZE_INFORMATION);
 
@@ -180,12 +185,14 @@ DokanFsSizeInformation(
 }
 
 
+
+
 ULONG
-DokanFsAttributeInformation(
+FuserFsAttributeInformation(
 	PEVENT_INFORMATION	EventInfo,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_FILE_INFO	FileInfo,
-	PDOKAN_OPERATIONS	DokanOperations)
+	PFUSER_FILE_INFO	FileInfo,
+	PFUSER_OPERATIONS	FuserOperations)
 {
 	WCHAR	volumeName[MAX_PATH];
 	DWORD	volumeSerial;
@@ -200,8 +207,8 @@ DokanFsAttributeInformation(
 	PFILE_FS_ATTRIBUTE_INFORMATION attrInfo = 
 		(PFILE_FS_ATTRIBUTE_INFORMATION)EventInfo->Buffer;
 	
-	if (!DokanOperations->GetVolumeInformation) {
-		DokanOperations->GetVolumeInformation = DokanGetVolumeInformation;
+	if (!FuserOperations->GetVolumeInformation) {
+		FuserOperations->GetVolumeInformation = FuserGetVolumeInformation;
 		//return STATUS_NOT_IMPLEMENTED;
 	}
 
@@ -215,7 +222,7 @@ DokanFsAttributeInformation(
 	RtlZeroMemory(volumeName, sizeof(volumeName));
 	RtlZeroMemory(fsName, sizeof(fsName));
 
-	status = DokanOperations->GetVolumeInformation(
+	status = FuserOperations->GetVolumeInformation(
 				volumeName,			// VolumeNameBuffer
 				sizeof(volumeName),	// VolumeNameSize
 				&volumeSerial,		// VolumeSerialNumber
@@ -250,24 +257,27 @@ DokanFsAttributeInformation(
 }
 
 
+
+
+
 ULONG
-DokanFsFullSizeInformation(
+FuserFsFullSizeInformation(
 	PEVENT_INFORMATION	EventInfo,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_FILE_INFO	FileInfo,
-	PDOKAN_OPERATIONS	DokanOperations)
+	PFUSER_FILE_INFO	FileInfo,
+	PFUSER_OPERATIONS	FuserOperations)
 {
 	ULONGLONG	freeBytesAvailable = 0;
 	ULONGLONG	totalBytes = 0;
 	ULONGLONG	freeBytes = 0;
-	
+
 	int			status = -1;
 
 	PFILE_FS_FULL_SIZE_INFORMATION sizeInfo = (PFILE_FS_FULL_SIZE_INFORMATION)EventInfo->Buffer;
 
 	
-	if (!DokanOperations->GetDiskFreeSpace) {
-		DokanOperations->GetDiskFreeSpace = DokanGetDiskFreeSpace;
+	if (!FuserOperations->GetDiskFreeSpace) {
+		FuserOperations->GetDiskFreeSpace = FuserGetDiskFreeSpace;
 		//return STATUS_NOT_IMPLEMENTED;
 	}
 
@@ -275,7 +285,7 @@ DokanFsFullSizeInformation(
 		return STATUS_BUFFER_OVERFLOW;
 	}
 
-	status = DokanOperations->GetDiskFreeSpace(
+	status = FuserOperations->GetDiskFreeSpace(
 		&freeBytesAvailable, // FreeBytesAvailable
 		&totalBytes, // TotalNumberOfBytes
 		&freeBytes, // TotalNumberOfFreeBytes
@@ -285,11 +295,11 @@ DokanFsFullSizeInformation(
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	sizeInfo->TotalAllocationUnits.QuadPart		= totalBytes / DOKAN_ALLOCATION_UNIT_SIZE;
-	sizeInfo->ActualAvailableAllocationUnits.QuadPart = freeBytes / DOKAN_ALLOCATION_UNIT_SIZE;
-	sizeInfo->CallerAvailableAllocationUnits.QuadPart = freeBytesAvailable / DOKAN_ALLOCATION_UNIT_SIZE;
-	sizeInfo->SectorsPerAllocationUnit			= DOKAN_ALLOCATION_UNIT_SIZE / DOKAN_SECTOR_SIZE;
-	sizeInfo->BytesPerSector					= DOKAN_SECTOR_SIZE;
+	sizeInfo->TotalAllocationUnits.QuadPart		= totalBytes / FUSER_ALLOCATION_UNIT_SIZE;
+	sizeInfo->ActualAvailableAllocationUnits.QuadPart = freeBytes / FUSER_ALLOCATION_UNIT_SIZE;
+	sizeInfo->CallerAvailableAllocationUnits.QuadPart = freeBytesAvailable / FUSER_ALLOCATION_UNIT_SIZE;
+	sizeInfo->SectorsPerAllocationUnit			= FUSER_ALLOCATION_UNIT_SIZE / FUSER_SECTOR_SIZE;
+	sizeInfo->BytesPerSector					= FUSER_SECTOR_SIZE;
 
 	EventInfo->BufferLength = sizeof(FILE_FS_FULL_SIZE_INFORMATION);
 
@@ -297,15 +307,19 @@ DokanFsFullSizeInformation(
 }
 
 
+
+
+
+
 VOID
 DispatchQueryVolumeInformation(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance)
+	PFUSER_INSTANCE		FuserInstance)
 {
 	PEVENT_INFORMATION		eventInfo;
-	DOKAN_FILE_INFO			fileInfo;
-	PDOKAN_OPEN_INFO		openInfo;
+	FUSER_FILE_INFO			fileInfo;
+	PFUSER_OPEN_INFO		openInfo;
 	int						status = -1;
 	ULONG					sizeOfEventInfo = sizeof(EVENT_INFORMATION)
 								- 8 + EventContext->Volume.BufferLength;
@@ -313,17 +327,17 @@ DispatchQueryVolumeInformation(
 	eventInfo = (PEVENT_INFORMATION)malloc(sizeOfEventInfo);
 
 	RtlZeroMemory(eventInfo, sizeOfEventInfo);
-	RtlZeroMemory(&fileInfo, sizeof(DOKAN_FILE_INFO));
+	RtlZeroMemory(&fileInfo, sizeof(FUSER_FILE_INFO));
 
 	// There is no Context because file is not opened
 	// so DispatchCommon is not used here
-	openInfo = (PDOKAN_OPEN_INFO)EventContext->Context;
-	
+	openInfo = (PFUSER_OPEN_INFO)EventContext->Context; // TODO: Convert call to methods without context
+
 	eventInfo->BufferLength = 0;
 	eventInfo->SerialNumber = EventContext->SerialNumber;
 
 	fileInfo.ProcessId = EventContext->ProcessId;
-	fileInfo.DokanOptions = DokanInstance->DokanOptions;
+	fileInfo.FuserOptions = FuserInstance->FuserOptions;
 
 	eventInfo->Status = STATUS_NOT_IMPLEMENTED;
 	eventInfo->BufferLength = 0;
@@ -332,21 +346,24 @@ DispatchQueryVolumeInformation(
 
 	switch (EventContext->Volume.FsInformationClass) {
 	case FileFsVolumeInformation:
-		eventInfo->Status = DokanFsVolumeInformation(
-								eventInfo, EventContext, &fileInfo, DokanInstance->DokanOperations);
+		eventInfo->Status = FuserFsVolumeInformation(
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
 		break;
+
 	case FileFsSizeInformation:
-		eventInfo->Status = DokanFsSizeInformation(
-								eventInfo, EventContext, &fileInfo, DokanInstance->DokanOperations);
+		eventInfo->Status = FuserFsSizeInformation(
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
 		break;
 	case FileFsAttributeInformation:
-		eventInfo->Status = DokanFsAttributeInformation(
-								eventInfo, EventContext, &fileInfo, DokanInstance->DokanOperations);
+		eventInfo->Status = FuserFsAttributeInformation(
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
 		break;
+
 	case FileFsFullSizeInformation:
-		eventInfo->Status = DokanFsFullSizeInformation(
-								eventInfo, EventContext, &fileInfo, DokanInstance->DokanOperations);
+		eventInfo->Status = FuserFsFullSizeInformation(
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
 		break;
+
 	default:
 		DbgPrint("error unknown volume info %d\n", EventContext->Volume.FsInformationClass);
 	}
@@ -355,3 +372,4 @@ DispatchQueryVolumeInformation(
 	free(eventInfo);
 	return;
 }
+

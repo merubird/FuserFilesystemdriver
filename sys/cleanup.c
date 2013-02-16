@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,11 +18,11 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#include "dokan.h"
+#include "fuser.h"
 
 
 NTSTATUS
-DokanDispatchCleanup(
+FuserDispatchCleanup(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
@@ -45,12 +44,12 @@ Return Value:
 
 --*/
 {
-	PDokanVCB			vcb;
+	PFuserVCB			vcb;
 	PIO_STACK_LOCATION	irpSp;
 	NTSTATUS			status = STATUS_INVALID_PARAMETER;
 	PFILE_OBJECT		fileObject;
-	PDokanCCB			ccb = NULL;
-	PDokanFCB			fcb = NULL;
+	PFuserCCB			ccb = NULL;
+	PFuserFCB			fcb = NULL;
 	PEVENT_CONTEXT		eventContext;
 	ULONG				eventLength;
 
@@ -60,24 +59,24 @@ Return Value:
 
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanCleanup\n");
+		FDbgPrint("==> FuserCleanup\n");
 	
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 		fileObject = irpSp->FileObject;
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DokanPrintFileName(fileObject);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FuserPrintFileName(fileObject);
 
 		// Cleanup must be success in any case
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject == NULL\n");
+			FDbgPrint("  fileObject == NULL\n");
 			status = STATUS_SUCCESS;
 			__leave;
 		}
 
 		vcb = DeviceObject->DeviceExtension;
 		if (GetIdentifierType(vcb) != VCB ||
-			!DokanCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
+			!FuserCheckCCB(vcb->Dcb, fileObject->FsContext2)) {
 			status = STATUS_SUCCESS;
 			__leave;
 		}
@@ -105,14 +104,14 @@ Return Value:
 		fileObject->Flags |= FO_CLEANUP_COMPLETE;
 
 		eventContext->Context = ccb->UserContext;
-		//DDbgPrint("   get Context %X\n", (ULONG)ccb->UserContext);
+		//FDbgPrint("   get Context %X\n", (ULONG)ccb->UserContext);
 
 		// copy the filename to EventContext from ccb
 		eventContext->Cleanup.FileNameLength = fcb->FileName.Length;
 		RtlCopyMemory(eventContext->Cleanup.FileName, fcb->FileName.Buffer, fcb->FileName.Length);
 
 		// register this IRP to pending IRP list
-		status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
+		status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
 
 	} __finally {
 
@@ -120,10 +119,10 @@ Return Value:
 			Irp->IoStatus.Status = status;
 			Irp->IoStatus.Information = 0;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			DokanPrintNTStatus(status);
+			FuserPrintNTStatus(status);
 		}
 
-		DDbgPrint("<== DokanCleanup\n");
+		FDbgPrint("<== FuserCleanup\n");
 	
 		FsRtlExitFileSystem();
 	}
@@ -133,8 +132,9 @@ Return Value:
 
 
 
+
 VOID
-DokanCompleteCleanup(
+FuserCompleteCleanup(
 	 __in PIRP_ENTRY			IrpEntry,
 	 __in PEVENT_INFORMATION	EventInfo
 	 )
@@ -143,12 +143,12 @@ DokanCompleteCleanup(
 	PIO_STACK_LOCATION	irpSp;
 	NTSTATUS			status   = STATUS_SUCCESS;
 	ULONG				info	 = 0;
-	PDokanCCB			ccb;
-	PDokanFCB			fcb;
-	PDokanVCB			vcb;
+	PFuserCCB			ccb;
+	PFuserFCB			fcb;
+	PFuserVCB			vcb;
 	PFILE_OBJECT		fileObject;
 
-	DDbgPrint("==> DokanCompleteCleanup\n");
+	FDbgPrint("==> FuserCompleteCleanup\n");
 
 	irp   = IrpEntry->Irp;
 	irpSp = IrpEntry->IrpSp;
@@ -160,7 +160,7 @@ DokanCompleteCleanup(
 	ASSERT(ccb != NULL);
 
 	ccb->UserContext = EventInfo->Context;
-	//DDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
+	//FDbgPrint("   set Context %X\n", (ULONG)ccb->UserContext);
 
 	fcb = ccb->Fcb;
 	ASSERT(fcb != NULL);
@@ -169,7 +169,7 @@ DokanCompleteCleanup(
 
 	status = EventInfo->Status;
 
-	if (fcb->Flags & DOKAN_FILE_DIRECTORY) {
+	if (fcb->Flags & FUSER_FILE_DIRECTORY) {
 		FsRtlNotifyCleanup(vcb->NotifySync, &vcb->DirNotifyList, ccb);
 	}
 
@@ -177,7 +177,6 @@ DokanCompleteCleanup(
 	irp->IoStatus.Information = 0;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DDbgPrint("<== DokanCompleteCleanup\n");
+	FDbgPrint("<== FuserCompleteCleanup\n");
 }
-
 

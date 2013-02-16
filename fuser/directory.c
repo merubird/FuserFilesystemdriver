@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,23 +17,68 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 #include "list.h"
+
+// TODO: belong to the method FuserIsNameInExpression, check if can be removed
+#define DOS_STAR                        (L'<')
+#define DOS_QM                          (L'>')
+#define DOS_DOT                         (L'"')
+
+
+
 
 #if _MSC_VER < 1300 // VC6
 typedef ULONG ULONG_PTR;
 #endif
 
-typedef struct _DOKAN_FIND_DATA {
+typedef struct _FUSER_FIND_DATA {
 	WIN32_FIND_DATAW	FindData;
 	LIST_ENTRY			ListEntry;
-} DOKAN_FIND_DATA, *PDOKAN_FIND_DATA;
+} FUSER_FIND_DATA, *PFUSER_FIND_DATA;
+
+
 
 
 VOID
-DokanFillDirInfo(
+ClearFindData(
+  PLIST_ENTRY	ListHead)
+{
+	// free all list entries
+	while(!IsListEmpty(ListHead)) {
+		PLIST_ENTRY entry = RemoveHeadList(ListHead);
+		PFUSER_FIND_DATA find = CONTAINING_RECORD(entry, FUSER_FIND_DATA, ListEntry);
+		free(find);
+	}
+}
+
+
+
+
+int WINAPI
+FuserFillFileData(
+	PWIN32_FIND_DATAW	FindData,
+	PFUSER_FILE_INFO	FileInfo)
+{
+	PLIST_ENTRY listHead = ((PFUSER_OPEN_INFO)FileInfo->FuserContext)->DirListHead;
+	PFUSER_FIND_DATA	findData;
+	
+	findData = malloc(sizeof(FUSER_FIND_DATA));
+	ZeroMemory(findData, sizeof(FUSER_FIND_DATA));
+	InitializeListHead(&findData->ListEntry);
+
+	findData->FindData = *FindData;
+
+	InsertTailList(listHead, &findData->ListEntry);
+	return 0;
+}
+
+
+
+
+VOID
+FuserFillDirInfo(
 	PFILE_DIRECTORY_INFORMATION	Buffer,
 	PWIN32_FIND_DATAW			FindData,
 	ULONG						Index)
@@ -67,7 +111,7 @@ DokanFillDirInfo(
 
 
 VOID
-DokanFillFullDirInfo(
+FuserFillFullDirInfo(
 	PFILE_FULL_DIR_INFORMATION	Buffer,
 	PWIN32_FIND_DATAW			FindData,
 	ULONG						Index)
@@ -101,10 +145,24 @@ DokanFillFullDirInfo(
 }
 
 
+VOID
+FuserFillNamesInfo(
+	PFILE_NAMES_INFORMATION	Buffer,
+	PWIN32_FIND_DATAW		FindData,
+	ULONG					Index)
+{
+	ULONG nameBytes = wcslen(FindData->cFileName) * sizeof(WCHAR);
+
+	Buffer->FileIndex = Index;
+	Buffer->FileNameLength = nameBytes;
+
+	RtlCopyMemory(Buffer->FileName, FindData->cFileName, nameBytes);
+}
+
 
 VOID
-DokanFillIdFullDirInfo(
-	PFILE_ID_FULL_DIR_INFORMATION	Buffer,
+FuserFillBothDirInfo(
+	PFILE_BOTH_DIR_INFORMATION		Buffer,
 	PWIN32_FIND_DATAW				FindData,
 	ULONG							Index)
 {
@@ -113,6 +171,7 @@ DokanFillIdFullDirInfo(
 	Buffer->FileIndex = Index;
 	Buffer->FileAttributes = FindData->dwFileAttributes;
 	Buffer->FileNameLength = nameBytes;
+	Buffer->ShortNameLength = 0;
 
 	Buffer->EndOfFile.HighPart = FindData->nFileSizeHigh;
 	Buffer->EndOfFile.LowPart   = FindData->nFileSizeLow;
@@ -132,14 +191,14 @@ DokanFillIdFullDirInfo(
 	Buffer->ChangeTime.LowPart  = FindData->ftLastWriteTime.dwLowDateTime;
 
 	Buffer->EaSize = 0;
-	Buffer->FileId.QuadPart = 0;
 
 	RtlCopyMemory(Buffer->FileName, FindData->cFileName, nameBytes);
 }
 
 
+
 VOID
-DokanFillIdBothDirInfo(
+FuserFillIdBothDirInfo(
 	PFILE_ID_BOTH_DIR_INFORMATION	Buffer,
 	PWIN32_FIND_DATAW				FindData,
 	ULONG							Index)
@@ -175,59 +234,13 @@ DokanFillIdBothDirInfo(
 }
 
 
-VOID
-DokanFillBothDirInfo(
-	PFILE_BOTH_DIR_INFORMATION		Buffer,
-	PWIN32_FIND_DATAW				FindData,
-	ULONG							Index)
-{
-	ULONG nameBytes = wcslen(FindData->cFileName) * sizeof(WCHAR);
-
-	Buffer->FileIndex = Index;
-	Buffer->FileAttributes = FindData->dwFileAttributes;
-	Buffer->FileNameLength = nameBytes;
-	Buffer->ShortNameLength = 0;
-
-	Buffer->EndOfFile.HighPart = FindData->nFileSizeHigh;
-	Buffer->EndOfFile.LowPart   = FindData->nFileSizeLow;
-	Buffer->AllocationSize.HighPart = FindData->nFileSizeHigh;
-	Buffer->AllocationSize.LowPart = FindData->nFileSizeLow;
-
-	Buffer->CreationTime.HighPart = FindData->ftCreationTime.dwHighDateTime;
-	Buffer->CreationTime.LowPart  = FindData->ftCreationTime.dwLowDateTime;
-
-	Buffer->LastAccessTime.HighPart = FindData->ftLastAccessTime.dwHighDateTime;
-	Buffer->LastAccessTime.LowPart  = FindData->ftLastAccessTime.dwLowDateTime;
-
-	Buffer->LastWriteTime.HighPart = FindData->ftLastWriteTime.dwHighDateTime;
-	Buffer->LastWriteTime.LowPart  = FindData->ftLastWriteTime.dwLowDateTime;
-
-	Buffer->ChangeTime.HighPart = FindData->ftLastWriteTime.dwHighDateTime;
-	Buffer->ChangeTime.LowPart  = FindData->ftLastWriteTime.dwLowDateTime;
-
-	Buffer->EaSize = 0;
-
-	RtlCopyMemory(Buffer->FileName, FindData->cFileName, nameBytes);
-}
 
 
-VOID
-DokanFillNamesInfo(
-	PFILE_NAMES_INFORMATION	Buffer,
-	PWIN32_FIND_DATAW		FindData,
-	ULONG					Index)
-{
-	ULONG nameBytes = wcslen(FindData->cFileName) * sizeof(WCHAR);
 
-	Buffer->FileIndex = Index;
-	Buffer->FileNameLength = nameBytes;
-
-	RtlCopyMemory(Buffer->FileName, FindData->cFileName, nameBytes);
-}
 
 
 ULONG
-DokanFillDirectoryInformation(
+FuserFillDirectoryInformation(
 	FILE_INFORMATION_CLASS	DirectoryInfo,
 	PVOID					Buffer,
 	PULONG					LengthRemaining,
@@ -274,19 +287,19 @@ DokanFillDirectoryInformation(
 
 	switch (DirectoryInfo) {
 	case FileDirectoryInformation:
-		DokanFillDirInfo(Buffer, FindData, Index);
+		FuserFillDirInfo(Buffer, FindData, Index);
 		break;
 	case FileFullDirectoryInformation:
-		DokanFillFullDirInfo(Buffer, FindData, Index);
+		FuserFillFullDirInfo(Buffer, FindData, Index);
 		break;
 	case FileNamesInformation:
-		DokanFillNamesInfo(Buffer, FindData, Index);
+		FuserFillNamesInfo(Buffer, FindData, Index);
 		break;
 	case FileBothDirectoryInformation:
-		DokanFillBothDirInfo(Buffer, FindData, Index);
+		FuserFillBothDirInfo(Buffer, FindData, Index);
 		break;
 	case FileIdBothDirectoryInformation:
-		DokanFillIdBothDirInfo(Buffer, FindData, Index);
+		FuserFillIdBothDirInfo(Buffer, FindData, Index);
 		break;
 	default:
 		break;
@@ -300,38 +313,6 @@ DokanFillDirectoryInformation(
 
 
 
-
-int WINAPI
-DokanFillFileData(
-	PWIN32_FIND_DATAW	FindData,
-	PDOKAN_FILE_INFO	FileInfo)
-{
-	PLIST_ENTRY listHead = ((PDOKAN_OPEN_INFO)FileInfo->DokanContext)->DirListHead;
-	PDOKAN_FIND_DATA	findData;
-	
-	findData = malloc(sizeof(DOKAN_FIND_DATA));
-	ZeroMemory(findData, sizeof(DOKAN_FIND_DATA));
-	InitializeListHead(&findData->ListEntry);
-
-	findData->FindData = *FindData;
-
-	InsertTailList(listHead, &findData->ListEntry);
-	return 0;
-}
-
-
-
-VOID
-ClearFindData(
-  PLIST_ENTRY	ListHead)
-{
-	// free all list entries
-	while(!IsListEmpty(ListHead)) {
-		PLIST_ENTRY entry = RemoveHeadList(ListHead);
-		PDOKAN_FIND_DATA find = CONTAINING_RECORD(entry, DOKAN_FIND_DATA, ListEntry);
-		free(find);
-	}
-}
 
 
 
@@ -365,22 +346,23 @@ MatchFiles(
     for(thisEntry = listHead->Flink;
 		thisEntry != listHead;
 		thisEntry = nextEntry) {
-        
-		PDOKAN_FIND_DATA	find;
+
+		PFUSER_FIND_DATA	find;
 		nextEntry = thisEntry->Flink;
 
-		find = CONTAINING_RECORD(thisEntry, DOKAN_FIND_DATA, ListEntry);
+		find = CONTAINING_RECORD(thisEntry, FUSER_FIND_DATA, ListEntry);
 
 		DbgPrintW(L"FileMatch? : %s (%s,%d,%d)\n", find->FindData.cFileName,
 			(pattern ? pattern : L"null"),
 			EventContext->Directory.FileIndex, index);
 
 		// pattern is not specified or pattern match is ignore cases
-		if (!pattern || DokanIsNameInExpression(pattern, find->FindData.cFileName, TRUE)) {
-			
+		if (!pattern || FuserIsNameInExpression(pattern, find->FindData.cFileName, TRUE)) {
+
 			if(EventContext->Directory.FileIndex <= index) {
 				// index+1 is very important, should use next entry index
-				ULONG entrySize = DokanFillDirectoryInformation(
+
+				ULONG entrySize = FuserFillDirectoryInformation(
 									EventContext->Directory.FileInformationClass,
 									currentBuffer, &lengthRemaining, &find->FindData, index+1);
 				// buffer is full
@@ -407,6 +389,7 @@ MatchFiles(
 			}
 			index++;
 		}
+
 	}
 
 	// Since next of the last entry doesn't exist, clear next offset
@@ -423,16 +406,15 @@ MatchFiles(
 }
 
 
-
 VOID
 DispatchDirectoryInformation(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance)
+	PFUSER_INSTANCE		FuserInstance)
 {
 	PEVENT_INFORMATION	eventInfo;
-	DOKAN_FILE_INFO		fileInfo;
-	PDOKAN_OPEN_INFO	openInfo;
+	FUSER_FILE_INFO		fileInfo;
+	PFUSER_OPEN_INFO	openInfo;
 	int					status = 0;
 	ULONG				fileInfoClass = EventContext->Directory.FileInformationClass;
 	ULONG				sizeOfEventInfo = sizeof(EVENT_INFORMATION) - 8 + EventContext->Directory.BufferLength;
@@ -442,7 +424,7 @@ DispatchDirectoryInformation(
 	CheckFileName(EventContext->Directory.DirectoryName);
 
 	eventInfo = DispatchCommon(
-		EventContext, sizeOfEventInfo, DokanInstance, &fileInfo, &openInfo);
+		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
 	// check whether this is handled FileInfoClass
 	if (fileInfoClass != FileDirectoryInformation &&
@@ -456,7 +438,7 @@ DispatchDirectoryInformation(
 		// send directory info to driver
 		eventInfo->BufferLength = 0;
 		eventInfo->Status = STATUS_NOT_IMPLEMENTED;
-		SendEventInformation(Handle, eventInfo, sizeOfEventInfo, DokanInstance);
+		SendEventInformation(Handle, eventInfo, sizeOfEventInfo, FuserInstance);
 		free(eventInfo);
 		return;
 	}
@@ -480,7 +462,7 @@ DispatchDirectoryInformation(
 		DbgPrint("###FindFiles %04d\n", openInfo->EventId);
 
 		// if user defined FindFilesWithPattern
-		if (DokanInstance->DokanOperations->FindFilesWithPattern) {
+		if (FuserInstance->FuserOperations->FindFilesWithPattern) {
 			LPCWSTR	pattern = L"*";
 		
 			// if search pattern is specified
@@ -491,27 +473,25 @@ DispatchDirectoryInformation(
 
 			patternCheck = FALSE; // do not recheck pattern later in MatchFiles
 
-			status = DokanInstance->DokanOperations->FindFilesWithPattern(
+			status = FuserInstance->FuserOperations->FindFilesWithPattern(
 						EventContext->Directory.DirectoryName,
 						pattern,
-						DokanFillFileData,
+						FuserFillFileData,
 						&fileInfo);
 	
-		} else if (DokanInstance->DokanOperations->FindFiles) {
+		} else if (FuserInstance->FuserOperations->FindFiles) {
 
 			patternCheck = TRUE; // do pattern check later in MachFiles
 
 			// call FileSystem specifeid callback routine
-			status = DokanInstance->DokanOperations->FindFiles(
+			status = FuserInstance->FuserOperations->FindFiles(
 						EventContext->Directory.DirectoryName,
-						DokanFillFileData,
+						FuserFillFileData,
 						&fileInfo);
 		} else {
 			status = -1;
 		}
 	}
-
-
 
 	if (status < 0) {
 
@@ -553,23 +533,18 @@ DispatchDirectoryInformation(
 			DbgPrint("index to %d\n", index);
 			eventInfo->Directory.Index	= index;
 		}
-		
 	}
 
 	// information for FileSystem
 	openInfo->UserContext = fileInfo.Context;
 
 	// send directory information to driver
-	SendEventInformation(Handle, eventInfo, sizeOfEventInfo, DokanInstance);
+	SendEventInformation(Handle, eventInfo, sizeOfEventInfo, FuserInstance);
 	free(eventInfo);
 	return;
 }
 
 
-
-#define DOS_STAR                        (L'<')
-#define DOS_QM                          (L'>')
-#define DOS_DOT                         (L'"')
 
 // check whether Name matches Expression
 // Expression can contain "?"(any one character) and "*" (any string)
@@ -584,8 +559,9 @@ DispatchDirectoryInformation(
 //        contiguous DOS_QMs.
 // DOS_STAR Matches zero or more characters until encountering and matching
 //          the final . in the name.
-BOOL DOKANAPI
-DokanIsNameInExpression(
+// TODO: perhaps remove this method
+BOOL FUSERAPI
+FuserIsNameInExpression(
 	LPCWSTR		Expression, // matching pattern
 	LPCWSTR		Name, // file name
 	BOOL		IgnoreCase)
@@ -601,7 +577,7 @@ DokanIsNameInExpression(
 				return TRUE;
 
 			while (Name[ni] != '\0') {
-				if (DokanIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
+				if (FuserIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
 					return TRUE;
 				ni++;
 			}
@@ -623,7 +599,7 @@ DokanIsNameInExpression(
 				if (Name[ni] == '\0' || ni == lastDot)
 					break;
 
-				if (DokanIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
+				if (FuserIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
 					return TRUE;
 				ni++;
 			}
@@ -671,5 +647,45 @@ DokanIsNameInExpression(
 
 	return FALSE;
 }
+
+
+
+/* TODO: no longer used
+VOID
+FuserFillIdFullDirInfo(
+	PFILE_ID_FULL_DIR_INFORMATION	Buffer,
+	PWIN32_FIND_DATAW				FindData,
+	ULONG							Index)
+{
+	ULONG nameBytes = wcslen(FindData->cFileName) * sizeof(WCHAR);
+
+	Buffer->FileIndex = Index;
+	Buffer->FileAttributes = FindData->dwFileAttributes;
+	Buffer->FileNameLength = nameBytes;
+
+	Buffer->EndOfFile.HighPart = FindData->nFileSizeHigh;
+	Buffer->EndOfFile.LowPart   = FindData->nFileSizeLow;
+	Buffer->AllocationSize.HighPart = FindData->nFileSizeHigh;
+	Buffer->AllocationSize.LowPart = FindData->nFileSizeLow;
+
+	Buffer->CreationTime.HighPart = FindData->ftCreationTime.dwHighDateTime;
+	Buffer->CreationTime.LowPart  = FindData->ftCreationTime.dwLowDateTime;
+
+	Buffer->LastAccessTime.HighPart = FindData->ftLastAccessTime.dwHighDateTime;
+	Buffer->LastAccessTime.LowPart  = FindData->ftLastAccessTime.dwLowDateTime;
+
+	Buffer->LastWriteTime.HighPart = FindData->ftLastWriteTime.dwHighDateTime;
+	Buffer->LastWriteTime.LowPart  = FindData->ftLastWriteTime.dwLowDateTime;
+
+	Buffer->ChangeTime.HighPart = FindData->ftLastWriteTime.dwHighDateTime;
+	Buffer->ChangeTime.LowPart  = FindData->ftLastWriteTime.dwLowDateTime;
+
+	Buffer->EaSize = 0;
+	Buffer->FileId.QuadPart = 0;
+
+	RtlCopyMemory(Buffer->FileName, FindData->cFileName, nameBytes);
+}
+*/
+
 
 

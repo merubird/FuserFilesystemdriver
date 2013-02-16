@@ -1,9 +1,8 @@
 /*
   Dokan : user-mode file system library for Windows
 
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
   Copyright (C) 2010 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,10 +17,13 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "dokan.h"
+// TODO: remove support for Filesecurity
+
+
+#include "fuser.h"
 
 NTSTATUS
-DokanDispatchQuerySecurity(
+FuserDispatchQuerySecurity(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
@@ -35,10 +37,10 @@ DokanDispatchQuerySecurity(
 	ULONG				descLength;
 	PSECURITY_DESCRIPTOR securityDesc;
 	PSECURITY_INFORMATION securityInfo;
-	PDokanFCB			fcb;
-	PDokanDCB			dcb;
-	PDokanVCB			vcb;
-	PDokanCCB			ccb;
+	PFuserFCB			fcb;
+	PFuserDCB			dcb;
+	PFuserVCB			vcb;
+	PFuserCCB			ccb;
 	ULONG				eventLength;
 	PEVENT_CONTEXT		eventContext;
 	ULONG				flags = 0;
@@ -46,31 +48,31 @@ DokanDispatchQuerySecurity(
 	__try {
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanQuerySecurity\n");
+		FDbgPrint("==> FuserQuerySecurity\n");
 
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 		fileObject = irpSp->FileObject;
 
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject == NULL\n");
+			FDbgPrint("  fileObject == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
 		vcb = DeviceObject->DeviceExtension;
 		if (GetIdentifierType(vcb) != VCB) {
-			DbgPrint("    DeviceExtension != VCB\n");
+			FDbgPrint("    DeviceExtension != VCB\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 		dcb = vcb->Dcb;
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DokanPrintFileName(fileObject);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FuserPrintFileName(fileObject);
 
 		ccb = fileObject->FsContext2;
 		if (ccb == NULL) {
-			DDbgPrint("    ccb == NULL\n");
+			FDbgPrint("    ccb == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
@@ -80,19 +82,19 @@ DokanDispatchQuerySecurity(
 		securityInfo = &irpSp->Parameters.QuerySecurity.SecurityInformation;
 
 		if (*securityInfo & OWNER_SECURITY_INFORMATION) {
-			DDbgPrint("    OWNER_SECURITY_INFORMATION\n");
+			FDbgPrint("    OWNER_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & GROUP_SECURITY_INFORMATION) {
-			DDbgPrint("    GROUP_SECURITY_INFORMATION\n");
+			FDbgPrint("    GROUP_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & DACL_SECURITY_INFORMATION) {
-			DDbgPrint("    DACL_SECURITY_INFORMATION\n");
+			FDbgPrint("    DACL_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & SACL_SECURITY_INFORMATION) {
-			DDbgPrint("    SACL_SECURITY_INFORMATION\n");
+			FDbgPrint("    SACL_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & LABEL_SECURITY_INFORMATION) {
-			DDbgPrint("    LABEL_SECURITY_INFORMATION\n");
+			FDbgPrint("    LABEL_SECURITY_INFORMATION\n");
 		}
 
 		eventLength = sizeof(EVENT_CONTEXT) + fcb->FileName.Length;
@@ -106,12 +108,12 @@ DokanDispatchQuerySecurity(
 		if (Irp->UserBuffer != NULL && bufferLength > 0) {
 			// make a MDL for UserBuffer that can be used later on another thread context	
 			if (Irp->MdlAddress == NULL) {
-				status = DokanAllocateMdl(Irp, bufferLength);
+				status = FuserAllocateMdl(Irp, bufferLength);
 				if (!NT_SUCCESS(status)) {
 					ExFreePool(eventContext);
 					__leave;
 				}
-				flags = DOKAN_MDL_ALLOCATED;
+				flags = FUSER_MDL_ALLOCATED;
 			}
 		}
 
@@ -123,7 +125,7 @@ DokanDispatchQuerySecurity(
 		RtlCopyMemory(eventContext->Security.FileName,
 				fcb->FileName.Buffer, fcb->FileName.Length);
 
-		status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext, flags);
+		status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext, flags);
 
 	} __finally {
 
@@ -131,10 +133,10 @@ DokanDispatchQuerySecurity(
 			Irp->IoStatus.Status = status;
 			Irp->IoStatus.Information = info;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			DokanPrintNTStatus(status);
+			FuserPrintNTStatus(status);
 		}
 
-		DDbgPrint("<== DokanQuerySecurity\n");
+		FDbgPrint("<== FuserQuerySecurity\n");
 		FsRtlExitFileSystem();
 	}
 
@@ -142,8 +144,9 @@ DokanDispatchQuerySecurity(
 }
 
 
+
 VOID
-DokanCompleteQuerySecurity(
+FuserCompleteQuerySecurity(
 	__in PIRP_ENTRY		IrpEntry,
 	__in PEVENT_INFORMATION EventInfo
 	)
@@ -155,9 +158,10 @@ DokanCompleteQuerySecurity(
 	ULONG		bufferLength;
 	ULONG		info = 0;
 	PFILE_OBJECT	fileObject;
-	PDokanCCB		ccb;
+	PFuserCCB		ccb;
 
-	DDbgPrint("==> DokanCompleteQuerySecurity\n");
+	FDbgPrint("==> FuserCompleteQuerySecurity\n");
+// TODO: trycatch missing here
 
 	irp   = IrpEntry->Irp;
 	irpSp = IrpEntry->IrpSp;	
@@ -185,9 +189,9 @@ DokanCompleteQuerySecurity(
 		status = EventInfo->Status;
 	}
 
-	if (IrpEntry->Flags & DOKAN_MDL_ALLOCATED) {
-		DokanFreeMdl(irp);
-		IrpEntry->Flags &= ~DOKAN_MDL_ALLOCATED;
+	if (IrpEntry->Flags & FUSER_MDL_ALLOCATED) {
+		FuserFreeMdl(irp);
+		IrpEntry->Flags &= ~FUSER_MDL_ALLOCATED;
 	}
 
 	fileObject = IrpEntry->FileObject;
@@ -197,30 +201,31 @@ DokanCompleteQuerySecurity(
 	if (ccb != NULL) {
 		ccb->UserContext = EventInfo->Context;
 	} else {
-		DDbgPrint("  ccb == NULL\n");
+		FDbgPrint("  ccb == NULL\n");
 	}
 
 	irp->IoStatus.Status = status;
 	irp->IoStatus.Information = info;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DokanPrintNTStatus(status);
+	FuserPrintNTStatus(status);
 
-	DDbgPrint("<== DokanCompleteQuerySecurity\n");
+	FDbgPrint("<== FuserCompleteQuerySecurity\n");
 }
 
 
+
 NTSTATUS
-DokanDispatchSetSecurity(
+FuserDispatchSetSecurity(
 	__in PDEVICE_OBJECT DeviceObject,
 	__in PIRP Irp
 	)
 {
 	PIO_STACK_LOCATION	irpSp;
-	PDokanVCB			vcb;
-	PDokanDCB			dcb;
-	PDokanCCB			ccb;
-	PDokanFCB			fcb;
+	PFuserVCB			vcb;
+	PFuserDCB			dcb;
+	PFuserCCB			ccb;
+	PFuserFCB			fcb;
 	NTSTATUS			status = STATUS_NOT_IMPLEMENTED;
 	PFILE_OBJECT		fileObject;
 	ULONG				info = 0;
@@ -234,31 +239,31 @@ DokanDispatchSetSecurity(
 	__try {
 		FsRtlEnterFileSystem();
 
-		DDbgPrint("==> DokanSetSecurity\n");
+		FDbgPrint("==> FuserSetSecurity\n");
 
 		irpSp = IoGetCurrentIrpStackLocation(Irp);
 		fileObject = irpSp->FileObject;
 
 		if (fileObject == NULL) {
-			DDbgPrint("  fileObject == NULL\n");
+			FDbgPrint("  fileObject == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 
 		vcb = DeviceObject->DeviceExtension;
 		if (GetIdentifierType(vcb) != VCB) {
-			DbgPrint("    DeviceExtension != VCB\n");
+			FDbgPrint("    DeviceExtension != VCB\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
 		dcb = vcb->Dcb;
 
-		DDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
-		DokanPrintFileName(fileObject);
+		FDbgPrint("  ProcessId %lu\n", IoGetRequestorProcessId(Irp));
+		FuserPrintFileName(fileObject);
 
 		ccb = fileObject->FsContext2;
 		if (ccb == NULL) {
-			DDbgPrint("    ccb == NULL\n");
+			FDbgPrint("    ccb == NULL\n");
 			status = STATUS_INVALID_PARAMETER;
 			__leave;
 		}
@@ -267,19 +272,19 @@ DokanDispatchSetSecurity(
 		securityInfo = &irpSp->Parameters.SetSecurity.SecurityInformation;
 
 		if (*securityInfo & OWNER_SECURITY_INFORMATION) {
-			DDbgPrint("    OWNER_SECURITY_INFORMATION\n");
+			FDbgPrint("    OWNER_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & GROUP_SECURITY_INFORMATION) {
-			DDbgPrint("    GROUP_SECURITY_INFORMATION\n");
+			FDbgPrint("    GROUP_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & DACL_SECURITY_INFORMATION) {
-			DDbgPrint("    DACL_SECURITY_INFORMATION\n");
+			FDbgPrint("    DACL_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & SACL_SECURITY_INFORMATION) {
-			DDbgPrint("    SACL_SECURITY_INFORMATION\n");
+			FDbgPrint("    SACL_SECURITY_INFORMATION\n");
 		}
 		if (*securityInfo & LABEL_SECURITY_INFORMATION) {
-			DDbgPrint("    LABEL_SECURITY_INFORMATION\n");
+			FDbgPrint("    LABEL_SECURITY_INFORMATION\n");
 		}
 
 		securityDescriptor = irpSp->Parameters.SetSecurity.SecurityDescriptor;
@@ -291,7 +296,7 @@ DokanDispatchSetSecurity(
 
 		if (EVENT_CONTEXT_MAX_SIZE < eventLength) {
 			// TODO: Handle this case like DispatchWrite.
-			DDbgPrint("    SecurityDescriptor is too big: %d (limit %d)\n",
+			FDbgPrint("    SecurityDescriptor is too big: %d (limit %d)\n",
 					eventLength, EVENT_CONTEXT_MAX_SIZE);
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			__leave;
@@ -315,7 +320,7 @@ DokanDispatchSetSecurity(
 		eventContext->SetSecurity.FileNameLength = fcb->FileName.Length;
 		RtlCopyMemory(eventContext->SetSecurity.FileName, fcb->FileName.Buffer, fcb->FileName.Length);
 
-		status = DokanRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
+		status = FuserRegisterPendingIrp(DeviceObject, Irp, eventContext, 0);
 
 	} __finally {
 
@@ -323,10 +328,10 @@ DokanDispatchSetSecurity(
 			Irp->IoStatus.Status = status;
 			Irp->IoStatus.Information = info;
 			IoCompleteRequest(Irp, IO_NO_INCREMENT);
-			DokanPrintNTStatus(status);
+			FuserPrintNTStatus(status);
 		}
 
-		DDbgPrint("<== DokanSetSecurity\n");
+		FDbgPrint("<== FuserSetSecurity\n");
 		FsRtlExitFileSystem();
 	}
 
@@ -334,8 +339,11 @@ DokanDispatchSetSecurity(
 }
 
 
+
+
+
 VOID
-DokanCompleteSetSecurity(
+FuserCompleteSetSecurity(
 	__in PIRP_ENTRY		IrpEntry,
 	__in PEVENT_INFORMATION EventInfo
 	)
@@ -343,10 +351,10 @@ DokanCompleteSetSecurity(
 	PIRP				irp;
 	PIO_STACK_LOCATION	irpSp;
 	PFILE_OBJECT		fileObject;
-	PDokanCCB			ccb;
+	PFuserCCB			ccb;
 	NTSTATUS			status;
 
-	DDbgPrint("==> DokanCompleteSetSecurity\n");
+	FDbgPrint("==> FuserCompleteSetSecurity\n");
 
 	irp   = IrpEntry->Irp;
 	irpSp = IrpEntry->IrpSp;	
@@ -358,7 +366,7 @@ DokanCompleteSetSecurity(
 	if (ccb != NULL) {
 		ccb->UserContext = EventInfo->Context;
 	} else {
-		DDbgPrint("  ccb == NULL\n");
+		FDbgPrint("  ccb == NULL\n");
 	}
 
 	status = EventInfo->Status;
@@ -367,7 +375,10 @@ DokanCompleteSetSecurity(
 	irp->IoStatus.Information = 0;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DokanPrintNTStatus(status);
+	FuserPrintNTStatus(status);
 
-	DDbgPrint("<== DokanCompleteSetSecurity\n");
+	FDbgPrint("<== FuserCompleteSetSecurity\n");
 }
+
+
+

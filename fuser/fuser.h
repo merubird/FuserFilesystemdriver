@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -19,49 +18,68 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 
-#ifndef _DOKAN_H_
-#define _DOKAN_H_
+#ifndef _FUSER_H_
+#define _FUSER_H_
 
-#define DOKAN_DRIVER_NAME	L"dokan.sys"
 
-#ifndef _M_X64	
-  #ifdef _EXPORTING
-	#define DOKANAPI __declspec(dllimport) __stdcall
-  #else
-	#define DOKANAPI __declspec(dllexport) __stdcall
-  #endif
-#else
-  #define DOKANAPI
-#endif
-
-#define DOKAN_CALLBACK __stdcall
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// The current Dokan version (ver 0.6.0). Please set this constant on DokanOptions->Version.
-#define DOKAN_VERSION		600
+#ifndef _M_X64	
+  #ifdef _EXPORTING
+	#define FUSERAPI __declspec(dllimport) __stdcall
+  #else
+	#define FUSERAPI __declspec(dllexport) __stdcall
+  #endif
+#else
+  #define FUSERAPI
+#endif
 
-#define DOKAN_OPTION_DEBUG		1 // ouput debug message
-#define DOKAN_OPTION_STDERR		2 // ouput debug message to stderr
-#define DOKAN_OPTION_ALT_STREAM	4 // use alternate stream
-#define DOKAN_OPTION_KEEP_ALIVE	8 // use auto unmount
-#define DOKAN_OPTION_NETWORK	16 // use network drive, you need to install Dokan network provider.
-#define DOKAN_OPTION_REMOVABLE	32 // use removable drive
+#define FUSER_CALLBACK __stdcall
 
-typedef struct _DOKAN_OPTIONS {
-	USHORT	Version; // Supported Dokan Version, ex. "530" (Dokan ver 0.5.3)
+
+
+#define FUSER_OPTION_DEBUG		1 // ouput debug message
+#define FUSER_OPTION_STDERR		2 // ouput debug message to stderr
+#define FUSER_OPTION_ALT_STREAM	4 // use alternate stream
+#define FUSER_OPTION_KEEP_ALIVE	8 // use auto unmount
+#define FUSER_OPTION_NETWORK	16 // use network drive, you need to install Fuser network provider.
+#define FUSER_OPTION_REMOVABLE	32 // use removable drive
+
+
+
+// The current Fuser version (ver 0.6.0). Please set this constant on FuserOptions->Version.
+#define FUSER_VERSION		600 // TODO: Adjust values
+
+
+// TODO: Adjust name
+#define FUSER_SUCCESS				 0
+#define FUSER_ERROR					-1 /* General Error */
+#define FUSER_DRIVE_LETTER_ERROR	-2 /* Bad Drive letter */
+#define FUSER_DRIVER_INSTALL_ERROR	-3 /* Can't install driver */
+#define FUSER_START_ERROR			-4 /* Driver something wrong */
+#define FUSER_MOUNT_ERROR			-5 /* Can't assign a drive letter or mount point */
+#define FUSER_MOUNT_POINT_ERROR		-6 /* Mount point is invalid */
+
+
+
+
+typedef struct _FUSER_OPTIONS {
+	USHORT	Version; // Supported Fuser Version, ex. "530" (Fuser ver 0.5.3)
 	USHORT	ThreadCount; // number of threads to be used
-	ULONG	Options;	 // combination of DOKAN_OPTIONS_*
+	ULONG	Options;	 // combination of FUSER_OPTIONS_*
 	ULONG64	GlobalContext; // FileSystem can use this variable
-	LPCWSTR	MountPoint; //  mount point "M:\" (drive letter) or "C:\mount\dokan" (path in NTFS)
-} DOKAN_OPTIONS, *PDOKAN_OPTIONS;
+	LPCWSTR	MountPoint; //  mount point "M:\" (drive letter) or "C:\mount\fuser" (path in NTFS)
+} FUSER_OPTIONS, *PFUSER_OPTIONS;
 
-typedef struct _DOKAN_FILE_INFO {
+
+
+typedef struct _FUSER_FILE_INFO {
 	ULONG64	Context;      // FileSystem can use this variable
-	ULONG64	DokanContext; // Don't touch this
-	PDOKAN_OPTIONS DokanOptions; // A pointer to DOKAN_OPTIONS which was  passed to DokanMain.
+	ULONG64	FuserContext; // Don't touch this
+	PFUSER_OPTIONS FuserOptions; // A pointer to FUSER_OPTIONS which was  passed to FuserMain.
 	ULONG	ProcessId;    // process id for the thread that originally requested a given I/O operation
 	UCHAR	IsDirectory;  // requesting a directory file
 	UCHAR	DeleteOnClose; // Delete on when "cleanup" is called
@@ -70,17 +88,19 @@ typedef struct _DOKAN_FILE_INFO {
 	UCHAR	Nocache;
 	UCHAR	WriteToEndOfFile; //  If true, write to the current end of file instead of Offset parameter.
 
-} DOKAN_FILE_INFO, *PDOKAN_FILE_INFO;
+} FUSER_FILE_INFO, *PFUSER_FILE_INFO;
 
 
 // FillFileData
 //   add an entry in FindFiles
 //   return 1 if buffer is full, otherwise 0
 //   (currently never return 1)
-typedef int (WINAPI *PFillFindData) (PWIN32_FIND_DATAW, PDOKAN_FILE_INFO);
+typedef int (WINAPI *PFillFindData) (PWIN32_FIND_DATAW, PFUSER_FILE_INFO);
 
-typedef struct _DOKAN_OPERATIONS {
 
+
+
+typedef struct _FUSER_OPERATIONS {
 	// When an error occurs, return negative value.
 	// Usually you should return GetLastError() * -1.
 
@@ -88,89 +108,88 @@ typedef struct _DOKAN_OPERATIONS {
 	// CreateFile
 	//   If file is a directory, CreateFile (not OpenDirectory) may be called.
 	//   In this case, CreateFile should return 0 when that directory can be opened.
-	//   You should set TRUE on DokanFileInfo->IsDirectory when file is a directory.
+	//   You should set TRUE on FuserFileInfo->IsDirectory when file is a directory.
 	//   When CreationDisposition is CREATE_ALWAYS or OPEN_ALWAYS and a file already exists,
 	//   you should return ERROR_ALREADY_EXISTS(183) (not negative value)
-	int (DOKAN_CALLBACK *CreateFile) (
+	int (FUSER_CALLBACK *CreateFile) (
 		LPCWSTR,      // FileName
 		DWORD,        // DesiredAccess
 		DWORD,        // ShareMode
 		DWORD,        // CreationDisposition
 		DWORD,        // FlagsAndAttributes
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-	int (DOKAN_CALLBACK *OpenDirectory) (
+	int (FUSER_CALLBACK *OpenDirectory) (
 		LPCWSTR,				// FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-	int (DOKAN_CALLBACK *CreateDirectory) (
+	int (FUSER_CALLBACK *CreateDirectory) (
 		LPCWSTR,				// FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 	// When FileInfo->DeleteOnClose is true, you must delete the file in Cleanup.
-	int (DOKAN_CALLBACK *Cleanup) (
+	int (FUSER_CALLBACK *Cleanup) (
 		LPCWSTR,      // FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-	int (DOKAN_CALLBACK *CloseFile) (
+	int (FUSER_CALLBACK *CloseFile) (
 		LPCWSTR,      // FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-	int (DOKAN_CALLBACK *ReadFile) (
+	int (FUSER_CALLBACK *ReadFile) (
 		LPCWSTR,  // FileName
 		LPVOID,   // Buffer
 		DWORD,    // NumberOfBytesToRead
 		LPDWORD,  // NumberOfBytesRead
 		LONGLONG, // Offset
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 	
 
-	int (DOKAN_CALLBACK *WriteFile) (
+	int (FUSER_CALLBACK *WriteFile) (
 		LPCWSTR,  // FileName
 		LPCVOID,  // Buffer
 		DWORD,    // NumberOfBytesToWrite
 		LPDWORD,  // NumberOfBytesWritten
 		LONGLONG, // Offset
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-
-	int (DOKAN_CALLBACK *FlushFileBuffers) (
+	int (FUSER_CALLBACK *FlushFileBuffers) (
 		LPCWSTR, // FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *GetFileInformation) (
+	int (FUSER_CALLBACK *GetFileInformation) (
 		LPCWSTR,          // FileName
 		LPBY_HANDLE_FILE_INFORMATION, // Buffer
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 	
 
-	int (DOKAN_CALLBACK *FindFiles) (
+	int (FUSER_CALLBACK *FindFiles) (
 		LPCWSTR,			// PathName
 		PFillFindData,		// call this function with PWIN32_FIND_DATAW
-		PDOKAN_FILE_INFO);  //  (see PFillFindData definition)
+		PFUSER_FILE_INFO);  //  (see PFillFindData definition)
 
 
 	// You should implement either FindFiles or FindFilesWithPattern
-	int (DOKAN_CALLBACK *FindFilesWithPattern) (
+	int (FUSER_CALLBACK *FindFilesWithPattern) (
 		LPCWSTR,			// PathName
 		LPCWSTR,			// SearchPattern
 		PFillFindData,		// call this function with PWIN32_FIND_DATAW
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *SetFileAttributes) (
+	int (FUSER_CALLBACK *SetFileAttributes) (
 		LPCWSTR, // FileName
 		DWORD,   // FileAttributes
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *SetFileTime) (
+	int (FUSER_CALLBACK *SetFileTime) (
 		LPCWSTR,		// FileName
 		CONST FILETIME*, // CreationTime
 		CONST FILETIME*, // LastAccessTime
 		CONST FILETIME*, // LastWriteTime
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
 	// You should not delete file on DeleteFile or DeleteDirectory.
@@ -181,63 +200,63 @@ typedef struct _DOKAN_OPERATIONS {
 	// When you return 0 (ERROR_SUCCESS), you get Cleanup with
 	// FileInfo->DeleteOnClose set TRUE and you have to delete the
 	// file in Close.
-	int (DOKAN_CALLBACK *DeleteFile) (
+	int (FUSER_CALLBACK *DeleteFile) (
 		LPCWSTR, // FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-	int (DOKAN_CALLBACK *DeleteDirectory) ( 
+	int (FUSER_CALLBACK *DeleteDirectory) ( 
 		LPCWSTR, // FileName
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *MoveFile) (
+	int (FUSER_CALLBACK *MoveFile) (
 		LPCWSTR, // ExistingFileName
 		LPCWSTR, // NewFileName
 		BOOL,	// ReplaceExisiting
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *SetEndOfFile) (
+	int (FUSER_CALLBACK *SetEndOfFile) (
 		LPCWSTR,  // FileName
 		LONGLONG, // Length
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *SetAllocationSize) (
+	int (FUSER_CALLBACK *SetAllocationSize) (
 		LPCWSTR,  // FileName
 		LONGLONG, // Length
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *LockFile) (
+	int (FUSER_CALLBACK *LockFile) (
 		LPCWSTR, // FileName
 		LONGLONG, // ByteOffset
 		LONGLONG, // Length
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *UnlockFile) (
+	int (FUSER_CALLBACK *UnlockFile) (
 		LPCWSTR, // FileName
 		LONGLONG,// ByteOffset
 		LONGLONG,// Length
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
 	// Neither GetDiskFreeSpace nor GetVolumeInformation
-	// save the DokanFileContext->Context.
+	// save the FuserFileContext->Context.
 	// Before these methods are called, CreateFile may not be called.
 	// (ditto CloseFile and Cleanup)
 
 	// see Win32 API GetDiskFreeSpaceEx
-	int (DOKAN_CALLBACK *GetDiskFreeSpace) (
+	int (FUSER_CALLBACK *GetDiskFreeSpace) (
 		PULONGLONG, // FreeBytesAvailable
 		PULONGLONG, // TotalNumberOfBytes
 		PULONGLONG, // TotalNumberOfFreeBytes
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
 	// see Win32 API GetVolumeInformation
-	int (DOKAN_CALLBACK *GetVolumeInformation) (
+	int (FUSER_CALLBACK *GetVolumeInformation) (
 		LPWSTR, // VolumeNameBuffer
 		DWORD,	// VolumeNameSize in num of chars
 		LPDWORD,// VolumeSerialNumber
@@ -245,91 +264,102 @@ typedef struct _DOKAN_OPERATIONS {
 		LPDWORD,// FileSystemFlags
 		LPWSTR,	// FileSystemNameBuffer
 		DWORD,	// FileSystemNameSize in num of chars
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
 
-	int (DOKAN_CALLBACK *Unmount) (
-		PDOKAN_FILE_INFO);
+	int (FUSER_CALLBACK *Unmount) (
+		PFUSER_FILE_INFO);
 
 
-	// Suported since 0.6.0. You must specify the version at DOKAN_OPTIONS.Version.
-	int (DOKAN_CALLBACK *GetFileSecurity) (
+	// Suported since 0.6.0. You must specify the version at FUSER_OPTIONS.Version.
+	int (FUSER_CALLBACK *GetFileSecurity) (
 		LPCWSTR, // FileName
 		PSECURITY_INFORMATION, // A pointer to SECURITY_INFORMATION value being requested
 		PSECURITY_DESCRIPTOR, // A pointer to SECURITY_DESCRIPTOR buffer to be filled
 		ULONG, // length of Security descriptor buffer
 		PULONG, // LengthNeeded
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
 
-	int (DOKAN_CALLBACK *SetFileSecurity) (
+	int (FUSER_CALLBACK *SetFileSecurity) (
 		LPCWSTR, // FileName
 		PSECURITY_INFORMATION,
 		PSECURITY_DESCRIPTOR, // SecurityDescriptor
 		ULONG, // SecurityDescriptor length
-		PDOKAN_FILE_INFO);
+		PFUSER_FILE_INFO);
+
+} FUSER_OPERATIONS, *PFUSER_OPERATIONS;
 
 
-} DOKAN_OPERATIONS, *PDOKAN_OPERATIONS;
+
+
+int FUSERAPI
+FuserMain(
+	PFUSER_OPTIONS	FuserOptions,
+	PFUSER_OPERATIONS FuserOperations);
 
 
 
-/* DokanMain returns error codes */
-#define DOKAN_SUCCESS				 0
-#define DOKAN_ERROR					-1 /* General Error */
-#define DOKAN_DRIVE_LETTER_ERROR	-2 /* Bad Drive letter */
-#define DOKAN_DRIVER_INSTALL_ERROR	-3 /* Can't install driver */
-#define DOKAN_START_ERROR			-4 /* Driver something wrong */
-#define DOKAN_MOUNT_ERROR			-5 /* Can't assign a drive letter or mount point */
-#define DOKAN_MOUNT_POINT_ERROR		-6 /* Mount point is invalid */
-
-int DOKANAPI
-DokanMain(
-	PDOKAN_OPTIONS	DokanOptions,
-	PDOKAN_OPERATIONS DokanOperations);
+BOOL FUSERAPI
+FuserUnmount(
+	WCHAR	DriveLetter);	
+	
+ULONG FUSERAPI
+FuserVersion();
 
 
-BOOL DOKANAPI
-DokanUnmount(
-	WCHAR	DriveLetter);
+ULONG FUSERAPI
+FuserDriverVersion();
 
-BOOL DOKANAPI
-DokanRemoveMountPoint(
+
+BOOL FUSERAPI
+FuserRemoveMountPoint(
 	LPCWSTR MountPoint);
+	
+
+	
 
 
-// DokanIsNameInExpression
+// FuserIsNameInExpression
 //   check whether Name can match Expression
 //   Expression can contain wildcard characters (? and *)
-BOOL DOKANAPI
-DokanIsNameInExpression(
+BOOL FUSERAPI
+FuserIsNameInExpression(  // TODO: check if method can be removed, but then also remove export in fuser.def
 	LPCWSTR		Expression,		// matching pattern
 	LPCWSTR		Name,			// file name
-	BOOL		IgnoreCase);
+	BOOL		IgnoreCase);	
 
 
-ULONG DOKANAPI
-DokanVersion();
 
-ULONG DOKANAPI
-DokanDriverVersion();
 
-// DokanResetTimeout
+// FuserResetTimeout
 //   extends the time out of the current IO operation in driver.
-BOOL DOKANAPI
-DokanResetTimeout(
+// TODO: Check if method can be removed or implemented differently -> FuserKeepAlive , remove export in fuser.def too.
+BOOL FUSERAPI
+FuserResetTimeout(
 	ULONG				Timeout,	// timeout in millisecond
-	PDOKAN_FILE_INFO	DokanFileInfo);
+	PFUSER_FILE_INFO	FuserFileInfo);
+
+	
+	
 
 // Get the handle to Access Token
 // This method needs be called in CreateFile, OpenDirectory or CreateDirectly callback.
 // The caller must call CloseHandle for the returned handle.
-HANDLE DOKANAPI
-DokanOpenRequestorToken(
-	PDOKAN_FILE_INFO	DokanFileInfo);
+HANDLE FUSERAPI
+FuserOpenRequestorToken(
+	PFUSER_FILE_INFO	FuserFileInfo);	
+	
+	
+
+
+/*
+// Obsolete and removed:
+//#define FUSER_DRIVER_NAME	L"fuser.sys" No longer needed
+*/
+
 
 #ifdef __cplusplus
 }
 #endif
 
-
-#endif // _DOKAN_H_
+#endif // _FUSER_H_

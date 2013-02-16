@@ -1,4 +1,4 @@
-TARGETNAME=dokan
+TARGETNAME=fuser
 TARGETTYPE=DYNLINK
 
 C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
@@ -11,7 +11,7 @@ USE_MSVCRT=1
 
 INCLUDES=..\sys\
 
-SOURCES=dokan.c \
+SOURCES=fuser.c \
 	write.c \
 	directory.c \
 	fileinfo.c \

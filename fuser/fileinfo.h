@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -21,7 +20,40 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #ifndef _FILEINFO_H_
 #define _FILEINFO_H_
 
+// TODO: Support of further error codes:
+#define STATUS_SUCCESS				   	(ULONG)0
+#define STATUS_NO_MORE_FILES            ((ULONG)0x80000006L)
+#define STATUS_END_OF_FILE              ((ULONG)0xC0000011L)
+#define STATUS_NO_SUCH_FILE             ((ULONG)0xC000000FL)
+#ifndef STATUS_INVALID_PARAMETER
+	#define STATUS_INVALID_PARAMETER        ((ULONG)0xC000000DL)
+#endif
+#define STATUS_NOT_IMPLEMENTED          ((ULONG)0xC0000002L)
+#define STATUS_BUFFER_OVERFLOW          ((ULONG)0x80000005L)
+#define STATUS_FILE_IS_A_DIRECTORY      ((ULONG)0xC00000BAL)
+#define STATUS_SHARING_VIOLATION        ((ULONG)0xC0000043L)
+#define STATUS_OBJECT_NAME_INVALID      ((ULONG)0xC0000033L)
+#define STATUS_OBJECT_NAME_NOT_FOUND    ((ULONG)0xC0000034L)
+#define STATUS_OBJECT_NAME_COLLISION    ((ULONG)0xC0000035L)
+#define STATUS_OBJECT_PATH_INVALID      ((ULONG)0xC0000039L)
+#define STATUS_OBJECT_PATH_NOT_FOUND    ((ULONG)0xC000003AL)
+#define STATUS_OBJECT_PATH_SYNTAX_BAD   ((ULONG)0xC000003BL)
+#define STATUS_ACCESS_DENIED            ((ULONG)0xC0000022L)
+#define STATUS_NOT_SUPPORTED            ((ULONG)0xC00000BBL)
+#define STATUS_FILE_LOCK_CONFLICT		((ULONG)0xC0000054L)
+#define STATUS_LOCK_NOT_GRANTED			((ULONG)0xC0000055L)
+#define STATUS_DELETE_PENDING			((ULONG)0xC0000056L)
+#define STATUS_DIRECTORY_NOT_EMPTY		((ULONG)0xC0000101L)
+#define STATUS_CANNOT_DELETE			((ULONG)0xC0000121L)
+#define STATUS_PRIVILEGE_NOT_HELD		((ULONG)0xC0000061L)
+#define STATUS_DISK_FULL				((ULONG)0xC000007FL)
+#define STATUS_DEVICE_NOT_READY			((ULONG)0xC00000A3L)
 
+
+
+
+
+// System IRP codes:
 #define IRP_MJ_CREATE                   0x00
 #define IRP_MJ_CREATE_NAMED_PIPE        0x01
 #define IRP_MJ_CLOSE                    0x02
@@ -54,10 +86,70 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define IRP_MJ_MAXIMUM_FUNCTION         0x1b
 
 
+#define SL_RESTART_SCAN                 0x01
+#define SL_RETURN_SINGLE_ENTRY          0x02
+#define SL_INDEX_SPECIFIED              0x04
+#define SL_FORCE_ACCESS_CHECK           0x01
+
+#define SL_OPEN_PAGING_FILE             0x02
+#define SL_OPEN_TARGET_DIRECTORY        0x04
+#define SL_CASE_SENSITIVE               0x80
+
+
+
+// TODO: change name
 #define IRP_MN_LOCK                     0x01
 #define IRP_MN_UNLOCK_SINGLE            0x02
 #define IRP_MN_UNLOCK_ALL               0x03
 #define IRP_MN_UNLOCK_ALL_BY_KEY        0x04
+
+
+
+// TODO: replace definitions
+
+
+
+#define FILE_SUPERSEDE                  0x00000000
+#define FILE_OPEN                       0x00000001
+#define FILE_CREATE                     0x00000002
+#define FILE_OPEN_IF                    0x00000003
+#define FILE_OVERWRITE                  0x00000004
+#define FILE_OVERWRITE_IF               0x00000005
+#define FILE_MAXIMUM_DISPOSITION        0x00000005
+
+
+
+#define FILE_DIRECTORY_FILE                     0x00000001
+#define FILE_WRITE_THROUGH                      0x00000002
+#define FILE_SEQUENTIAL_ONLY                    0x00000004
+#define FILE_NO_INTERMEDIATE_BUFFERING          0x00000008
+#define FILE_SYNCHRONOUS_IO_ALERT               0x00000010
+#define FILE_SYNCHRONOUS_IO_NONALERT            0x00000020
+#define FILE_NON_DIRECTORY_FILE                 0x00000040
+#define FILE_CREATE_TREE_CONNECTION             0x00000080
+#define FILE_DELETE_ON_CLOSE                    0x00001000
+
+#define FILE_VALID_OPTION_FLAGS                 0x00ffffff
+
+
+#define FILE_SUPERSEDED                 0x00000000
+#define FILE_OPENED                     0x00000001
+#define FILE_CREATED                    0x00000002
+#define FILE_OVERWRITTEN                0x00000003
+#define FILE_EXISTS                     0x00000004
+#define FILE_DOES_NOT_EXIST             0x00000005
+
+#define FILE_WRITE_TO_END_OF_FILE       0xffffffff
+#define FILE_USE_FILE_POINTER_POSITION  0xfffffffe
+
+
+
+
+
+
+
+// enums:
+
 
 
 typedef enum _FILE_INFORMATION_CLASS {
@@ -129,10 +221,11 @@ typedef enum _FSINFOCLASS {
 } FS_INFORMATION_CLASS, *PFS_INFORMATION_CLASS;
 
 
-typedef struct _FILE_ALIGNMENT_INFORMATION {
-    ULONG AlignmentRequirement;
-} FILE_ALIGNMENT_INFORMATION, *PFILE_ALIGNMENT_INFORMATION;
 
+
+
+
+// structs
 
 typedef struct _FILE_NAME_INFORMATION {
     ULONG FileNameLength;
@@ -140,25 +233,7 @@ typedef struct _FILE_NAME_INFORMATION {
 } FILE_NAME_INFORMATION, *PFILE_NAME_INFORMATION;
 
 
-typedef struct _FILE_ATTRIBUTE_TAG_INFORMATION {
-    ULONG FileAttributes;
-    ULONG ReparseTag;
-} FILE_ATTRIBUTE_TAG_INFORMATION, *PFILE_ATTRIBUTE_TAG_INFORMATION;
 
-
-typedef struct _FILE_DISPOSITION_INFORMATION {
-    BOOLEAN DeleteFile;
-} FILE_DISPOSITION_INFORMATION, *PFILE_DISPOSITION_INFORMATION;
-
-
-typedef struct _FILE_END_OF_FILE_INFORMATION {
-    LARGE_INTEGER EndOfFile;
-} FILE_END_OF_FILE_INFORMATION, *PFILE_END_OF_FILE_INFORMATION;
-
-
-typedef struct _FILE_VALID_DATA_LENGTH_INFORMATION {
-    LARGE_INTEGER ValidDataLength;
-} FILE_VALID_DATA_LENGTH_INFORMATION, *PFILE_VALID_DATA_LENGTH_INFORMATION;
 
 
 typedef struct _FILE_BASIC_INFORMATION {
@@ -170,6 +245,18 @@ typedef struct _FILE_BASIC_INFORMATION {
 } FILE_BASIC_INFORMATION, *PFILE_BASIC_INFORMATION;
 
 
+
+typedef struct _FILE_INTERNAL_INFORMATION {
+    LARGE_INTEGER IndexNumber;
+} FILE_INTERNAL_INFORMATION, *PFILE_INTERNAL_INFORMATION;
+
+
+typedef struct _FILE_EA_INFORMATION {
+    ULONG EaSize;
+} FILE_EA_INFORMATION, *PFILE_EA_INFORMATION;
+
+
+
 typedef struct _FILE_STANDARD_INFORMATION {
     LARGE_INTEGER AllocationSize;
     LARGE_INTEGER EndOfFile;
@@ -179,57 +266,91 @@ typedef struct _FILE_STANDARD_INFORMATION {
 } FILE_STANDARD_INFORMATION, *PFILE_STANDARD_INFORMATION;
 
 
+typedef struct _FILE_ACCESS_INFORMATION {
+    ACCESS_MASK AccessFlags;
+} FILE_ACCESS_INFORMATION, *PFILE_ACCESS_INFORMATION;
+
+
+
 typedef struct _FILE_POSITION_INFORMATION {
     LARGE_INTEGER CurrentByteOffset;
 } FILE_POSITION_INFORMATION, *PFILE_POSITION_INFORMATION;
 
 
-typedef struct _FILE_DIRECTORY_INFORMATION {
-    ULONG NextEntryOffset;
-    ULONG FileIndex;
+typedef struct _FILE_MODE_INFORMATION {
+    ULONG Mode;
+} FILE_MODE_INFORMATION, *PFILE_MODE_INFORMATION;
+
+
+typedef struct _FILE_ALIGNMENT_INFORMATION {
+    ULONG AlignmentRequirement;
+} FILE_ALIGNMENT_INFORMATION, *PFILE_ALIGNMENT_INFORMATION;
+
+typedef struct _FILE_ALL_INFORMATION {
+    FILE_BASIC_INFORMATION BasicInformation;
+    FILE_STANDARD_INFORMATION StandardInformation;
+    FILE_INTERNAL_INFORMATION InternalInformation;
+    FILE_EA_INFORMATION EaInformation;
+    FILE_ACCESS_INFORMATION AccessInformation;
+    FILE_POSITION_INFORMATION PositionInformation;
+    FILE_MODE_INFORMATION ModeInformation;
+    FILE_ALIGNMENT_INFORMATION AlignmentInformation;
+    FILE_NAME_INFORMATION NameInformation;
+} FILE_ALL_INFORMATION, *PFILE_ALL_INFORMATION;
+
+
+typedef struct _FILE_ATTRIBUTE_TAG_INFORMATION {
+    ULONG FileAttributes;
+    ULONG ReparseTag;
+} FILE_ATTRIBUTE_TAG_INFORMATION, *PFILE_ATTRIBUTE_TAG_INFORMATION;
+
+
+
+typedef struct _FILE_NETWORK_OPEN_INFORMATION {
     LARGE_INTEGER CreationTime;
     LARGE_INTEGER LastAccessTime;
     LARGE_INTEGER LastWriteTime;
     LARGE_INTEGER ChangeTime;
-    LARGE_INTEGER EndOfFile;
     LARGE_INTEGER AllocationSize;
-    ULONG FileAttributes;
-    ULONG FileNameLength;
-    WCHAR FileName[1];
-} FILE_DIRECTORY_INFORMATION, *PFILE_DIRECTORY_INFORMATION;
-
-
-typedef struct _FILE_FULL_DIR_INFORMATION {
-    ULONG NextEntryOffset;
-    ULONG FileIndex;
-    LARGE_INTEGER CreationTime;
-    LARGE_INTEGER LastAccessTime;
-    LARGE_INTEGER LastWriteTime;
-    LARGE_INTEGER ChangeTime;
     LARGE_INTEGER EndOfFile;
-    LARGE_INTEGER AllocationSize;
     ULONG FileAttributes;
-    ULONG FileNameLength;
-    ULONG EaSize;
-    WCHAR FileName[1];
-} FILE_FULL_DIR_INFORMATION, *PFILE_FULL_DIR_INFORMATION;
+} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
 
 
-typedef struct _FILE_ID_FULL_DIR_INFORMATION {
-    ULONG NextEntryOffset;
-    ULONG FileIndex;
-    LARGE_INTEGER CreationTime;
-    LARGE_INTEGER LastAccessTime;
-    LARGE_INTEGER LastWriteTime;
-    LARGE_INTEGER ChangeTime;
-    LARGE_INTEGER EndOfFile;
-    LARGE_INTEGER AllocationSize;
-    ULONG FileAttributes;
-    ULONG FileNameLength;
-    ULONG EaSize;
-    LARGE_INTEGER FileId;
-    WCHAR FileName[1];
-} FILE_ID_FULL_DIR_INFORMATION, *PFILE_ID_FULL_DIR_INFORMATION;
+
+typedef struct _FILE_FS_VOLUME_INFORMATION {
+    LARGE_INTEGER VolumeCreationTime;
+    ULONG VolumeSerialNumber;
+    ULONG VolumeLabelLength;
+    BOOLEAN SupportsObjects;
+    WCHAR VolumeLabel[1];
+} FILE_FS_VOLUME_INFORMATION, *PFILE_FS_VOLUME_INFORMATION;
+
+
+typedef struct _FILE_FS_SIZE_INFORMATION {
+    LARGE_INTEGER TotalAllocationUnits;
+    LARGE_INTEGER AvailableAllocationUnits;
+    ULONG SectorsPerAllocationUnit;
+    ULONG BytesPerSector;
+} FILE_FS_SIZE_INFORMATION, *PFILE_FS_SIZE_INFORMATION;
+
+
+
+typedef struct _FILE_FS_ATTRIBUTE_INFORMATION {
+    ULONG FileSystemAttributes;
+    LONG MaximumComponentNameLength;
+    ULONG FileSystemNameLength;
+    WCHAR FileSystemName[1];
+} FILE_FS_ATTRIBUTE_INFORMATION, *PFILE_FS_ATTRIBUTE_INFORMATION;
+
+
+typedef struct _FILE_FS_FULL_SIZE_INFORMATION {
+    LARGE_INTEGER TotalAllocationUnits;
+    LARGE_INTEGER CallerAvailableAllocationUnits;
+    LARGE_INTEGER ActualAvailableAllocationUnits;
+    ULONG SectorsPerAllocationUnit;
+    ULONG BytesPerSector;
+} FILE_FS_FULL_SIZE_INFORMATION, *PFILE_FS_FULL_SIZE_INFORMATION;
 
 
 typedef struct _FILE_BOTH_DIR_INFORMATION {
@@ -248,6 +369,46 @@ typedef struct _FILE_BOTH_DIR_INFORMATION {
     WCHAR ShortName[12];
     WCHAR FileName[1];
 } FILE_BOTH_DIR_INFORMATION, *PFILE_BOTH_DIR_INFORMATION;
+
+
+typedef struct _FILE_DIRECTORY_INFORMATION {
+    ULONG NextEntryOffset;
+    ULONG FileIndex;
+    LARGE_INTEGER CreationTime;
+    LARGE_INTEGER LastAccessTime;
+    LARGE_INTEGER LastWriteTime;
+    LARGE_INTEGER ChangeTime;
+    LARGE_INTEGER EndOfFile;
+    LARGE_INTEGER AllocationSize;
+    ULONG FileAttributes;
+    ULONG FileNameLength;
+    WCHAR FileName[1];
+} FILE_DIRECTORY_INFORMATION, *PFILE_DIRECTORY_INFORMATION;
+
+
+
+typedef struct _FILE_NAMES_INFORMATION {
+    ULONG NextEntryOffset;
+    ULONG FileIndex;
+    ULONG FileNameLength;
+    WCHAR FileName[1];
+} FILE_NAMES_INFORMATION, *PFILE_NAMES_INFORMATION;
+
+
+typedef struct _FILE_FULL_DIR_INFORMATION {
+    ULONG NextEntryOffset;
+    ULONG FileIndex;
+    LARGE_INTEGER CreationTime;
+    LARGE_INTEGER LastAccessTime;
+    LARGE_INTEGER LastWriteTime;
+    LARGE_INTEGER ChangeTime;
+    LARGE_INTEGER EndOfFile;
+    LARGE_INTEGER AllocationSize;
+    ULONG FileAttributes;
+    ULONG FileNameLength;
+    ULONG EaSize;
+    WCHAR FileName[1];
+} FILE_FULL_DIR_INFORMATION, *PFILE_FULL_DIR_INFORMATION;
 
 
 typedef struct _FILE_ID_BOTH_DIR_INFORMATION {
@@ -269,54 +430,10 @@ typedef struct _FILE_ID_BOTH_DIR_INFORMATION {
 } FILE_ID_BOTH_DIR_INFORMATION, *PFILE_ID_BOTH_DIR_INFORMATION;
 
 
-typedef struct _FILE_NAMES_INFORMATION {
-    ULONG NextEntryOffset;
-    ULONG FileIndex;
-    ULONG FileNameLength;
-    WCHAR FileName[1];
-} FILE_NAMES_INFORMATION, *PFILE_NAMES_INFORMATION;
+typedef struct _FILE_DISPOSITION_INFORMATION {
+    BOOLEAN DeleteFile;
+} FILE_DISPOSITION_INFORMATION, *PFILE_DISPOSITION_INFORMATION;
 
-
-#define ANSI_DOS_STAR   ('<')
-#define ANSI_DOS_QM     ('>')
-#define ANSI_DOS_DOT    ('"')
-
-#define DOS_STAR        (L'<')
-#define DOS_QM          (L'>')
-#define DOS_DOT         (L'"')
-
-
-typedef struct _FILE_INTERNAL_INFORMATION {
-    LARGE_INTEGER IndexNumber;
-} FILE_INTERNAL_INFORMATION, *PFILE_INTERNAL_INFORMATION;
-
-
-typedef struct _FILE_EA_INFORMATION {
-    ULONG EaSize;
-} FILE_EA_INFORMATION, *PFILE_EA_INFORMATION;
-
-
-typedef struct _FILE_ACCESS_INFORMATION {
-    ACCESS_MASK AccessFlags;
-} FILE_ACCESS_INFORMATION, *PFILE_ACCESS_INFORMATION;
-
-
-typedef struct _FILE_MODE_INFORMATION {
-    ULONG Mode;
-} FILE_MODE_INFORMATION, *PFILE_MODE_INFORMATION;
-
-
-typedef struct _FILE_ALL_INFORMATION {
-    FILE_BASIC_INFORMATION BasicInformation;
-    FILE_STANDARD_INFORMATION StandardInformation;
-    FILE_INTERNAL_INFORMATION InternalInformation;
-    FILE_EA_INFORMATION EaInformation;
-    FILE_ACCESS_INFORMATION AccessInformation;
-    FILE_POSITION_INFORMATION PositionInformation;
-    FILE_MODE_INFORMATION ModeInformation;
-    FILE_ALIGNMENT_INFORMATION AlignmentInformation;
-    FILE_NAME_INFORMATION NameInformation;
-} FILE_ALL_INFORMATION, *PFILE_ALL_INFORMATION;
 
 
 typedef struct _FILE_ALLOCATION_INFORMATION {
@@ -324,108 +441,30 @@ typedef struct _FILE_ALLOCATION_INFORMATION {
 } FILE_ALLOCATION_INFORMATION, *PFILE_ALLOCATION_INFORMATION;
 
 
-typedef struct _FILE_COMPRESSION_INFORMATION {
-    LARGE_INTEGER CompressedFileSize;
-    USHORT CompressionFormat;
-    UCHAR CompressionUnitShift;
-    UCHAR ChunkShift;
-    UCHAR ClusterShift;
-    UCHAR Reserved[3];
-} FILE_COMPRESSION_INFORMATION, *PFILE_COMPRESSION_INFORMATION;
 
-
-typedef struct _FILE_LINK_INFORMATION {
-    BOOLEAN ReplaceIfExists;
-    HANDLE RootDirectory;
-    ULONG FileNameLength;
-    WCHAR FileName[1];
-} FILE_LINK_INFORMATION, *PFILE_LINK_INFORMATION;
-
-
-typedef struct _FILE_RENAME_INFORMATION {
-    BOOLEAN ReplaceIfExists;
-    HANDLE RootDirectory;
-    ULONG FileNameLength;
-    WCHAR FileName[1];
-} FILE_RENAME_INFORMATION, *PFILE_RENAME_INFORMATION;
-
-
-typedef struct _FILE_STREAM_INFORMATION {
-    ULONG NextEntryOffset;
-    ULONG StreamNameLength;
-    LARGE_INTEGER StreamSize;
-    LARGE_INTEGER StreamAllocationSize;
-    WCHAR StreamName[1];
-} FILE_STREAM_INFORMATION, *PFILE_STREAM_INFORMATION;
-
-
-
-typedef struct _FILE_FS_LABEL_INFORMATION {
-    ULONG VolumeLabelLength;
-    WCHAR VolumeLabel[1];
-} FILE_FS_LABEL_INFORMATION, *PFILE_FS_LABEL_INFORMATION;
-
-
-typedef struct _FILE_FS_VOLUME_INFORMATION {
-    LARGE_INTEGER VolumeCreationTime;
-    ULONG VolumeSerialNumber;
-    ULONG VolumeLabelLength;
-    BOOLEAN SupportsObjects;
-    WCHAR VolumeLabel[1];
-} FILE_FS_VOLUME_INFORMATION, *PFILE_FS_VOLUME_INFORMATION;
-
-
-typedef struct _FILE_FS_SIZE_INFORMATION {
-    LARGE_INTEGER TotalAllocationUnits;
-    LARGE_INTEGER AvailableAllocationUnits;
-    ULONG SectorsPerAllocationUnit;
-    ULONG BytesPerSector;
-} FILE_FS_SIZE_INFORMATION, *PFILE_FS_SIZE_INFORMATION;
-
-
-typedef struct _FILE_FS_FULL_SIZE_INFORMATION {
-    LARGE_INTEGER TotalAllocationUnits;
-    LARGE_INTEGER CallerAvailableAllocationUnits;
-    LARGE_INTEGER ActualAvailableAllocationUnits;
-    ULONG SectorsPerAllocationUnit;
-    ULONG BytesPerSector;
-} FILE_FS_FULL_SIZE_INFORMATION, *PFILE_FS_FULL_SIZE_INFORMATION;
-
-
-typedef struct _FILE_FS_OBJECTID_INFORMATION {
-    UCHAR ObjectId[16];
-    UCHAR ExtendedInfo[48];
-} FILE_FS_OBJECTID_INFORMATION, *PFILE_FS_OBJECTID_INFORMATION;
-
-
-typedef struct _FILE_FS_ATTRIBUTE_INFORMATION {
-    ULONG FileSystemAttributes;
-    LONG MaximumComponentNameLength;
-    ULONG FileSystemNameLength;
-    WCHAR FileSystemName[1];
-} FILE_FS_ATTRIBUTE_INFORMATION, *PFILE_FS_ATTRIBUTE_INFORMATION;
-
-
-typedef struct _FILE_NETWORK_OPEN_INFORMATION {
-    LARGE_INTEGER CreationTime;
-    LARGE_INTEGER LastAccessTime;
-    LARGE_INTEGER LastWriteTime;
-    LARGE_INTEGER ChangeTime;
-    LARGE_INTEGER AllocationSize;
+typedef struct _FILE_END_OF_FILE_INFORMATION {
     LARGE_INTEGER EndOfFile;
-    ULONG FileAttributes;
-} FILE_NETWORK_OPEN_INFORMATION, *PFILE_NETWORK_OPEN_INFORMATION;
+} FILE_END_OF_FILE_INFORMATION, *PFILE_END_OF_FILE_INFORMATION;
 
 
-#define SL_RESTART_SCAN                 0x01
-#define SL_RETURN_SINGLE_ENTRY          0x02
-#define SL_INDEX_SPECIFIED              0x04
-#define SL_FORCE_ACCESS_CHECK           0x01
+typedef struct _FUSER_LINK_INFORMATION {
+	BOOLEAN ReplaceIfExists;
+	ULONG FileNameLength;
+	WCHAR FileName[1];
+} FUSER_LINK_INFORMATION, *PFUSER_LINK_INFORMATION;
 
-#define SL_OPEN_PAGING_FILE             0x02
-#define SL_OPEN_TARGET_DIRECTORY        0x04
-#define SL_CASE_SENSITIVE               0x80
 
+
+typedef struct _FILE_VALID_DATA_LENGTH_INFORMATION {
+    LARGE_INTEGER ValidDataLength;
+} FILE_VALID_DATA_LENGTH_INFORMATION, *PFILE_VALID_DATA_LENGTH_INFORMATION;
+
+
+
+
+
+
+// TODO: Check which of these are really needed
 #define ALIGN_DOWN(length, type) \
     ((ULONG)(length) & ~(sizeof(type) - 1))
 
@@ -466,66 +505,80 @@ typedef struct _FILE_NETWORK_OPEN_INFORMATION {
 #define IsPtrQuadAligned(Ptr) (           \
     QuadAlignPtr(Ptr) == (PVOID)(Ptr)     \
     )
-
-
-#define STATUS_SUCCESS				   	(ULONG)0
-#define STATUS_NO_MORE_FILES            ((ULONG)0x80000006L)
-#define STATUS_END_OF_FILE              ((ULONG)0xC0000011L)
-#define STATUS_NO_SUCH_FILE             ((ULONG)0xC000000FL)
-#ifndef STATUS_INVALID_PARAMETER
-	#define STATUS_INVALID_PARAMETER        ((ULONG)0xC000000DL)
-#endif
-#define STATUS_NOT_IMPLEMENTED          ((ULONG)0xC0000002L)
-#define STATUS_BUFFER_OVERFLOW          ((ULONG)0x80000005L)
-#define STATUS_FILE_IS_A_DIRECTORY      ((ULONG)0xC00000BAL)
-#define STATUS_SHARING_VIOLATION        ((ULONG)0xC0000043L)
-#define STATUS_OBJECT_NAME_INVALID      ((ULONG)0xC0000033L)
-#define STATUS_OBJECT_NAME_NOT_FOUND    ((ULONG)0xC0000034L)
-#define STATUS_OBJECT_NAME_COLLISION    ((ULONG)0xC0000035L)
-#define STATUS_OBJECT_PATH_INVALID      ((ULONG)0xC0000039L)
-#define STATUS_OBJECT_PATH_NOT_FOUND    ((ULONG)0xC000003AL)
-#define STATUS_OBJECT_PATH_SYNTAX_BAD   ((ULONG)0xC000003BL)
-#define STATUS_ACCESS_DENIED            ((ULONG)0xC0000022L)
-#define STATUS_NOT_SUPPORTED            ((ULONG)0xC00000BBL)
-#define STATUS_FILE_LOCK_CONFLICT		((ULONG)0xC0000054L)
-#define STATUS_LOCK_NOT_GRANTED			((ULONG)0xC0000055L)
-#define STATUS_DELETE_PENDING			((ULONG)0xC0000056L)
-#define STATUS_DIRECTORY_NOT_EMPTY		((ULONG)0xC0000101L)
-#define STATUS_CANNOT_DELETE			((ULONG)0xC0000121L)
-#define STATUS_PRIVILEGE_NOT_HELD		((ULONG)0xC0000061L)
-#define STATUS_DISK_FULL				((ULONG)0xC000007FL)
-#define STATUS_DEVICE_NOT_READY			((ULONG)0xC00000A3L)
-
-#define FILE_SUPERSEDE                  0x00000000
-#define FILE_OPEN                       0x00000001
-#define FILE_CREATE                     0x00000002
-#define FILE_OPEN_IF                    0x00000003
-#define FILE_OVERWRITE                  0x00000004
-#define FILE_OVERWRITE_IF               0x00000005
-#define FILE_MAXIMUM_DISPOSITION        0x00000005
-
-#define FILE_DIRECTORY_FILE                     0x00000001
-#define FILE_WRITE_THROUGH                      0x00000002
-#define FILE_SEQUENTIAL_ONLY                    0x00000004
-#define FILE_NO_INTERMEDIATE_BUFFERING          0x00000008
-#define FILE_DELETE_ON_CLOSE                    0x00001000
-
-#define FILE_SYNCHRONOUS_IO_ALERT               0x00000010
-#define FILE_SYNCHRONOUS_IO_NONALERT            0x00000020
-#define FILE_NON_DIRECTORY_FILE                 0x00000040
-#define FILE_CREATE_TREE_CONNECTION             0x00000080
-
-#define FILE_VALID_OPTION_FLAGS                 0x00ffffff
-
-#define FILE_SUPERSEDED                 0x00000000
-#define FILE_OPENED                     0x00000001
-#define FILE_CREATED                    0x00000002
-#define FILE_OVERWRITTEN                0x00000003
-#define FILE_EXISTS                     0x00000004
-#define FILE_DOES_NOT_EXIST             0x00000005
-
-#define FILE_WRITE_TO_END_OF_FILE       0xffffffff
-#define FILE_USE_FILE_POINTER_POSITION  0xfffffffe
+	
 
 
 #endif // _FILEINFO_H_
+
+
+
+
+/*  Obsolete and no longer needed
+typedef struct _FILE_ID_FULL_DIR_INFORMATION {
+    ULONG NextEntryOffset;
+    ULONG FileIndex;
+    LARGE_INTEGER CreationTime;
+    LARGE_INTEGER LastAccessTime;
+    LARGE_INTEGER LastWriteTime;
+    LARGE_INTEGER ChangeTime;
+    LARGE_INTEGER EndOfFile;
+    LARGE_INTEGER AllocationSize;
+    ULONG FileAttributes;
+    ULONG FileNameLength;
+    ULONG EaSize;
+    LARGE_INTEGER FileId;
+    WCHAR FileName[1];
+} FILE_ID_FULL_DIR_INFORMATION, *PFILE_ID_FULL_DIR_INFORMATION;
+
+#define ANSI_DOS_STAR   ('<')
+#define ANSI_DOS_QM     ('>')
+#define ANSI_DOS_DOT    ('"')
+
+#define DOS_STAR        (L'<')
+#define DOS_QM          (L'>')
+#define DOS_DOT         (L'"')
+
+typedef struct _FILE_COMPRESSION_INFORMATION {
+    LARGE_INTEGER CompressedFileSize;
+    USHORT CompressionFormat;
+    UCHAR CompressionUnitShift;
+    UCHAR ChunkShift;
+    UCHAR ClusterShift;
+    UCHAR Reserved[3];
+} FILE_COMPRESSION_INFORMATION, *PFILE_COMPRESSION_INFORMATION;
+
+typedef struct _FILE_LINK_INFORMATION {
+    BOOLEAN ReplaceIfExists;
+    HANDLE RootDirectory;
+    ULONG FileNameLength;
+    WCHAR FileName[1];
+} FILE_LINK_INFORMATION, *PFILE_LINK_INFORMATION;
+
+typedef struct _FILE_RENAME_INFORMATION {
+    BOOLEAN ReplaceIfExists;
+    HANDLE RootDirectory;
+    ULONG FileNameLength;
+    WCHAR FileName[1];
+} FILE_RENAME_INFORMATION, *PFILE_RENAME_INFORMATION;
+
+typedef struct _FILE_STREAM_INFORMATION {
+    ULONG NextEntryOffset;
+    ULONG StreamNameLength;
+    LARGE_INTEGER StreamSize;
+    LARGE_INTEGER StreamAllocationSize;
+    WCHAR StreamName[1];
+} FILE_STREAM_INFORMATION, *PFILE_STREAM_INFORMATION;
+
+typedef struct _FILE_FS_LABEL_INFORMATION {
+    ULONG VolumeLabelLength;
+    WCHAR VolumeLabel[1];
+} FILE_FS_LABEL_INFORMATION, *PFILE_FS_LABEL_INFORMATION;
+
+typedef struct _FILE_FS_OBJECTID_INFORMATION {
+    UCHAR ObjectId[16];
+    UCHAR ExtendedInfo[48];
+} FILE_FS_OBJECTID_INFORMATION, *PFILE_FS_OBJECTID_INFORMATION;
+*/
+
+
+

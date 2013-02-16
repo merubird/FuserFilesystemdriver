@@ -1,9 +1,8 @@
 /*
-  Dokan : user-mode file system library for Windows
+  Fuser : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
-
-  http://dokan-dev.net/en
+  Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+  Copyright (C) 2007 - 2011 Hiroki Asakawa http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -18,8 +17,7 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#include "dokani.h"
+#include "fuseri.h"
 #include "fileinfo.h"
 
 
@@ -27,36 +25,37 @@ VOID
 DispatchFlush(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
-	PDOKAN_INSTANCE		DokanInstance)
+	PFUSER_INSTANCE		FuserInstance)
 {
-	DOKAN_FILE_INFO		fileInfo;
+	FUSER_FILE_INFO		fileInfo;
 	PEVENT_INFORMATION	eventInfo;
 	ULONG				sizeOfEventInfo = sizeof(EVENT_INFORMATION);
-	PDOKAN_OPEN_INFO	openInfo;
+	PFUSER_OPEN_INFO	openInfo;
 	int status;
 
 	CheckFileName(EventContext->Flush.FileName);
 
 	eventInfo = DispatchCommon(
-		EventContext, sizeOfEventInfo, DokanInstance, &fileInfo, &openInfo);
+		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
 	DbgPrint("###Flush %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
 	eventInfo->Status = STATUS_SUCCESS;
 
-	if (DokanInstance->DokanOperations->FlushFileBuffers) {
+	if (FuserInstance->FuserOperations->FlushFileBuffers) {
 
-		status = DokanInstance->DokanOperations->FlushFileBuffers(
+		status = FuserInstance->FuserOperations->FlushFileBuffers(
 					EventContext->Flush.FileName,
 					&fileInfo);
 
+		// TODO: error codes
 		eventInfo->Status = status < 0 ?
 					STATUS_NOT_SUPPORTED : STATUS_SUCCESS;
 	}
 
 	openInfo->UserContext = fileInfo.Context;
 
-	SendEventInformation(Handle, eventInfo, sizeOfEventInfo, DokanInstance);
+	SendEventInformation(Handle, eventInfo, sizeOfEventInfo, FuserInstance);
 
 	free(eventInfo);
 	return;
