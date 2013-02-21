@@ -350,7 +350,7 @@ FuserOpenRequestorToken(
 	PFUSER_FILE_INFO	FuserFileInfo);	
 	
 	
-
+VOID DebugLogWrite(LPCWSTR z); // TODO: remove this
 
 /*
 // Obsolete and removed:

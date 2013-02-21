@@ -1,6 +1,7 @@
 /*
 
-Copyright (c) 2007, 2008 Hiroki Asakawa asakaw@gmail.com
+Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+Copyright (C) 2007, 2008 Hiroki Asakawa asakaw@gmail.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,30 +22,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-
 #ifndef _MOUNT_H_
 #define _MOUNT_H_
 
-#include "dokanc.h"
+#include "fuserc.h"
+#include "devioctl.h"
 #include "list.h"
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+
 typedef struct _MOUNT_ENTRY {
 	LIST_ENTRY		ListEntry;
-	DOKAN_CONTROL	MountControl;
+	FUSER_CONTROL	MountControl;
 } MOUNT_ENTRY, *PMOUNT_ENTRY;
 
+
+
+
+
 BOOL
-DokanControlMount(
+FuserControlMount(
 	LPCWSTR	MountPoint,
 	LPCWSTR	DeivceName);
 
+
 BOOL
-DokanControlUnmount(
-	LPCWSTR MountPoint);
+FuserControlUnmount(
+	LPCWSTR MountPoint);	
+
 
 #ifdef __cplusplus
 }

@@ -20,27 +20,6 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define _PUBLIC_H_
 
 
-
-// TODO: Remove this
-/*
-#include "devioctl.h" // TODO: move to right project
-#define DRIVER_FUNC_INSTALL     0x01
-#define DRIVER_FUNC_REMOVE      0x02
-#define FUSER_USED			2
-#define FUSER_DEVICE_MAX	10
-#define FUSER_FILE_DELETED		2
-#define WRITE_MAX_SIZE				(EVENT_CONTEXT_MAX_SIZE-sizeof(EVENT_CONTEXT)-256*sizeof(WCHAR))
-
-
-//typedef struct _FUSER_LINK_INFORMATION {
-//	BOOLEAN ReplaceIfExists;
-//	ULONG FileNameLength;
-//	WCHAR FileName[1];
-//} FUSER_LINK_INFORMATION, *PFUSER_LINK_INFORMATION;
-*/
-
-
-
 #define FUSER_DRIVER_VERSION	  0x0000190   // TODO: change value
 
 #define EVENT_CONTEXT_MAX_SIZE    (1024*32)
@@ -288,6 +267,24 @@ typedef struct _FUSER_RENAME_INFORMATION {
 	ULONG FileNameLength;
 	WCHAR FileName[1];
 } FUSER_RENAME_INFORMATION, *PFUSER_RENAME_INFORMATION;
+
+
+/* TODO: remove these codes, are no longer needed
+#include "devioctl.h" // TODO: move to right project
+#define DRIVER_FUNC_INSTALL     0x01
+#define DRIVER_FUNC_REMOVE      0x02
+#define FUSER_USED			2
+#define FUSER_DEVICE_MAX	10
+#define FUSER_FILE_DELETED		2
+#define WRITE_MAX_SIZE				(EVENT_CONTEXT_MAX_SIZE-sizeof(EVENT_CONTEXT)-256*sizeof(WCHAR))
+
+typedef struct _FUSER_LINK_INFORMATION {
+	BOOLEAN ReplaceIfExists;
+	ULONG FileNameLength;
+	WCHAR FileName[1];
+} FUSER_LINK_INFORMATION, *PFUSER_LINK_INFORMATION;
+*/
+
 
 
 #endif // _PUBLIC_H_

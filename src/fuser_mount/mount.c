@@ -1,6 +1,7 @@
 /*
 
-Copyright (c) 2007, 2008 Hiroki Asakawa asakaw@gmail.com
+Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+Copyright (C) 2007, 2008 Hiroki Asakawa asakaw@gmail.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,11 +22,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+
 #include <windows.h>
 #include <winioctl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "mount.h"
+
+
 
 typedef struct _REPARSE_DATA_BUFFER {
     ULONG  ReparseTag;
@@ -54,6 +58,65 @@ typedef struct _REPARSE_DATA_BUFFER {
 } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
 
 #define REPARSE_DATA_BUFFER_HEADER_SIZE   FIELD_OFFSET(REPARSE_DATA_BUFFER, GenericReparseBuffer)
+
+
+
+BOOL
+CreateDriveLetter(
+	WCHAR		DriveLetter,
+	LPCWSTR	DeviceName)
+{
+	WCHAR   dosDevice[] = L"\\\\.\\C:";
+	WCHAR   driveName[] = L"C:";
+	WCHAR	rawDeviceName[MAX_PATH] = L"\\Device";
+	HANDLE  device;
+	dosDevice[4] = DriveLetter;
+	driveName[0] = DriveLetter;
+	wcscat_s(rawDeviceName, MAX_PATH, DeviceName);
+
+	DbgPrintW(L"DriveLetter: %c, DeviceName %s\n", DriveLetter, rawDeviceName);
+
+	device = CreateFile(
+		dosDevice,
+		GENERIC_READ | GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_NO_BUFFERING,
+		NULL
+		);
+
+    if (device != INVALID_HANDLE_VALUE) {
+		DbgPrintW(L"FuserControl Mount failed: %c: is alredy used\n", DriveLetter);
+		CloseHandle(device);
+        return FALSE;
+    }
+
+    if (!DefineDosDevice(DDD_RAW_TARGET_PATH, driveName, rawDeviceName)) {
+		DbgPrintW(L"FuserControl DefineDosDevice failed: %d\n", GetLastError());
+        return FALSE;
+    }
+	device = CreateFile(
+        dosDevice,
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_FLAG_NO_BUFFERING,
+        NULL
+        );
+
+    if (device == INVALID_HANDLE_VALUE) {
+		DbgPrintW(L"FuserControl Mount %c failed:%d\n", DriveLetter, GetLastError());
+        DefineDosDevice(DDD_REMOVE_DEFINITION, dosDevice, NULL);
+        return FALSE;
+    }
+
+	CloseHandle(device);
+	return TRUE;
+}
+
+
 
 BOOL
 CreateMountPoint(
@@ -118,8 +181,31 @@ CreateMountPoint(
 		DbgPrintW(L"CreateMountPoint %s -> %s failed: %d\n",
 			MountPoint, targetDeviceName, GetLastError());
 	}
+
 	return result;
 }
+
+
+
+
+
+BOOL
+FuserControlMount(
+	LPCWSTR	MountPoint,
+	LPCWSTR	DeviceName)
+{
+	ULONG length = wcslen(MountPoint);
+	if (length == 1 ||
+		(length == 2 && MountPoint[1] == L':') ||
+		(length == 3 && MountPoint[1] == L':' && MountPoint[2] == L'\\')) {
+		return CreateDriveLetter(MountPoint[0], DeviceName);
+	} else if (length > 3) {
+		return CreateMountPoint(MountPoint, DeviceName);
+	}
+	return FALSE; 
+}
+
+
 
 BOOL
 DeleteMountPoint(
@@ -161,82 +247,10 @@ DeleteMountPoint(
 	return result;
 }
 
-BOOL
-CreateDriveLetter(
-	WCHAR		DriveLetter,
-	LPCWSTR	DeviceName)
-{
-	WCHAR   dosDevice[] = L"\\\\.\\C:";
-	WCHAR   driveName[] = L"C:";
-	WCHAR	rawDeviceName[MAX_PATH] = L"\\Device";
-	HANDLE  device;
 
-	dosDevice[4] = DriveLetter;
-	driveName[0] = DriveLetter;
-	wcscat_s(rawDeviceName, MAX_PATH, DeviceName);
-
-	DbgPrintW(L"DriveLetter: %c, DeviceName %s\n", DriveLetter, rawDeviceName);
-
-	device = CreateFile(
-		dosDevice,
-		GENERIC_READ | GENERIC_WRITE,
-		FILE_SHARE_READ | FILE_SHARE_WRITE,
-		NULL,
-		OPEN_EXISTING,
-		FILE_FLAG_NO_BUFFERING,
-		NULL
-		);
-
-    if (device != INVALID_HANDLE_VALUE) {
-		DbgPrintW(L"DokanControl Mount failed: %c: is alredy used\n", DriveLetter);
-		CloseHandle(device);
-        return FALSE;
-    }
-
-    if (!DefineDosDevice(DDD_RAW_TARGET_PATH, driveName, rawDeviceName)) {
-		DbgPrintW(L"DokanControl DefineDosDevice failed: %d\n", GetLastError());
-        return FALSE;
-    }
-
-	device = CreateFile(
-        dosDevice,
-        GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL,
-        OPEN_EXISTING,
-        FILE_FLAG_NO_BUFFERING,
-        NULL
-        );
-
-    if (device == INVALID_HANDLE_VALUE) {
-		DbgPrintW(L"DokanControl Mount %c failed:%d\n", DriveLetter, GetLastError());
-        DefineDosDevice(DDD_REMOVE_DEFINITION, dosDevice, NULL);
-        return FALSE;
-    }
-
-	CloseHandle(device);
-	return TRUE;
-}
 
 BOOL
-DokanControlMount(
-	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName)
-{
-	ULONG length = wcslen(MountPoint);
-
-	if (length == 1 ||
-		(length == 2 && MountPoint[1] == L':') ||
-		(length == 3 && MountPoint[1] == L':' && MountPoint[2] == L'\\')) {
-		return CreateDriveLetter(MountPoint[0], DeviceName);
-	} else if (length > 3) {
-		return CreateMountPoint(MountPoint, DeviceName);
-	}
-	return FALSE; 
-}
-
-BOOL
-DokanControlUnmount(
+FuserControlUnmount(
 	LPCWSTR	MountPoint)
 {
     
@@ -251,10 +265,10 @@ DokanControlUnmount(
 
 		if (!DefineDosDevice(DDD_REMOVE_DEFINITION, drive, NULL)) {
 			DbgPrintW(L"DriveLetter %c\n", MountPoint[0]);
-			DbgPrintW(L"DokanControl DefineDosDevice failed\n");
+			DbgPrintW(L"FuserControl DefineDosDevice failed\n");
 			return FALSE;
 		} else {
-			DbgPrintW(L"DokanControl DD_REMOVE_DEFINITION success\n");
+			DbgPrintW(L"FuserControl DD_REMOVE_DEFINITION success\n");
 			return TRUE;
 		}
 
@@ -264,3 +278,4 @@ DokanControlUnmount(
 
 	return FALSE;
 }
+

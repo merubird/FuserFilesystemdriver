@@ -1,6 +1,7 @@
 /*
 
-Copyright (c) 2007, 2008 Hiroki Asakawa asakaw@gmail.com
+Copyright (C) 2011 - 2013 Christian Auer christian.auer@gmx.ch
+Copyright (C) 2007, 2008 Hiroki Asakawa asakaw@gmail.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,26 +22,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+
 #include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <locale.h>
+#include "fuser.h"
+#include "fuserc.h"
 
-#include "dokan.h"
-#include "dokanc.h"
+
+#define GetOption(argc, argv, index) \
+	(((argc) > (index) && \
+		wcslen((argv)[(index)]) == 2 && \
+		(argv)[(index)][0] == L'/')? \
+		towlower((argv)[(index)][1]) : L'\0')
+
+
 
 int ShowMountList()
 {
-	DOKAN_CONTROL control;
+	FUSER_CONTROL control;
 	ULONG index = 0;
-	ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	ZeroMemory(&control, sizeof(FUSER_CONTROL));
 
-	control.Type = DOKAN_CONTROL_LIST;
+	control.Type = FUSER_CONTROL_LIST;
 	control.Option = 0;
-	control.Status = DOKAN_CONTROL_SUCCESS;
+	control.Status = FUSER_CONTROL_SUCCESS;
 
-	while(DokanMountControl(&control)) {
-		if (control.Status == DOKAN_CONTROL_SUCCESS) {
+	while(FuserMountControl(&control)) {
+		if (control.Status == FUSER_CONTROL_SUCCESS) {
 			fwprintf(stderr, L"[% 2d] MountPoint: %s\n     DeviceName: %s\n",
 				control.Option, control.MountPoint, control.DeviceName);
 			control.Option++;
@@ -49,54 +57,34 @@ int ShowMountList()
 		}
 	}
 	return 0;
-}
+}		
 
-int ShowUsage()
-{
-	fprintf(stderr,
-		"dokanctrl /u MountPoint (/f)\n" \
-		"dokanntl /m\n" \
-		"dokanctl /i [d|s|a]\n" \
-		"dokanctl /r [d|s|a]\n" \
-		"dokanctl /v\n" \
-		"\n" \
-		"Example:\n" \
-		"  /u M:               : Unmount M: drive\n" \
-		"  /u C:\\mount\\dokan   : Unmount mount point C:\\mount\\dokan\n" \
-		"  /u 1                : Unmount mount point 1\n" \
-		"  /u M: /f            : Force unmount M: drive\n" \
-		"  /m                  : Print mount points list\n" \
-		"  /i s                : Install mounter service\n" \
-		"  /r d                : Remove driver\n" \
-		"  /r a                : Remove driver and mounter service\n" \
-		"  /v                  : Print Dokan version\n");
-	return -1;
-}
 
 int Unmount(LPCWSTR	MountPoint, BOOL ForceUnmount)
 {
+
 	int status = 0;
-	DOKAN_CONTROL control;
-	ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	FUSER_CONTROL control;
+	ZeroMemory(&control, sizeof(FUSER_CONTROL));
 
 	if (wcslen(MountPoint) == 1 && L'0' <= MountPoint[0] && MountPoint[0] <= L'9') {
-		control.Type = DOKAN_CONTROL_LIST;
+		control.Type = FUSER_CONTROL_LIST;
 		control.Option = MountPoint[0] - L'0';
-		DokanMountControl(&control);
+		FuserMountControl(&control);
 
-		if (control.Status == DOKAN_CONTROL_SUCCESS) {
-			status = DokanRemoveMountPoint(control.MountPoint);
+		if (control.Status == FUSER_CONTROL_SUCCESS) {
+			status = FuserRemoveMountPoint(control.MountPoint);
 		} else {
 			fwprintf(stderr, L"Mount entry %d not found\n", control.Option);
 			status = -1;
 		}
 	} else if (ForceUnmount) {
-		control.Type = DOKAN_CONTROL_UNMOUNT;
-		control.Option = DOKAN_CONTROL_OPTION_FORCE_UNMOUNT;
+		control.Type = FUSER_CONTROL_UNMOUNT;
+		control.Option = FUSER_CONTROL_OPTION_FORCE_UNMOUNT;
 		wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
-		DokanMountControl(&control);
+		FuserMountControl(&control);
 
-		if (control.Status == DOKAN_CONTROL_SUCCESS) {
+		if (control.Status == FUSER_CONTROL_SUCCESS) {
 			fwprintf(stderr, L"Unmount success: %s", MountPoint);
 			status = 0;
 		} else {
@@ -105,18 +93,39 @@ int Unmount(LPCWSTR	MountPoint, BOOL ForceUnmount)
 		}
 
 	} else {
-		status = DokanRemoveMountPoint(MountPoint);
+		status = FuserRemoveMountPoint(MountPoint);
 	}
 
 	fwprintf(stderr, L"Unmount status = %d\n", status);
 	return status;
 }
 
-#define GetOption(argc, argv, index) \
-	(((argc) > (index) && \
-		wcslen((argv)[(index)]) == 2 && \
-		(argv)[(index)][0] == L'/')? \
-		towlower((argv)[(index)][1]) : L'\0')
+
+
+int ShowUsage()
+{
+	// TODO: Adjust filename
+	fprintf(stderr,
+		"fuserctrl /u MountPoint (/f)\n" \
+		"fuserntl /m\n" \
+		"fuserctl /i [d|s|a]\n" \
+		"fuserctl /r [d|s|a]\n" \
+		"fuserctl /v\n" \
+		"\n" \
+		"Example:\n" \
+		"  /u M:               : Unmount M: drive\n" \
+		"  /u C:\\mount\\fuser   : Unmount mount point C:\\mount\\fuser\n" \
+		"  /u 1                : Unmount mount point 1\n" \
+		"  /u M: /f            : Force unmount M: drive\n" \
+		"  /m                  : Print mount points list\n" \
+		"  /i s                : Install mounter service\n" \
+		"  /r d                : Remove driver\n" \
+		"  /r a                : Remove driver and mounter service\n" \
+		"  /v                  : Print Fuser version\n");
+	return -1;
+}
+
+
 
 int __cdecl
 wmain(int argc, PWCHAR argv[])
@@ -140,27 +149,25 @@ wmain(int argc, PWCHAR argv[])
 	ZeroMemory(driverFullPath, sizeof(driverFullPath));
 	wcscpy_s(mounterFullPath, MAX_PATH, fileName);
 	mounterFullPath[i] = L'\\';
-	wcscat_s(mounterFullPath, MAX_PATH, L"mounter.exe");
+	wcscat_s(mounterFullPath, MAX_PATH, L"mounter.exe");  // TODO: When change the filename, change this too.
 
 	GetSystemDirectory(driverFullPath, MAX_PATH);
-	wcscat_s(driverFullPath, MAX_PATH, L"\\drivers\\dokan.sys");
+	wcscat_s(driverFullPath, MAX_PATH, L"\\drivers\\fuser.sys"); // TODO: When change the filename, change this too.
 
 	fwprintf(stderr, L"driver path %s\n", driverFullPath);
 	fwprintf(stderr, L"mounter path %s\n", mounterFullPath);
 
 
 	if (GetOption(argc, argv, 1) == L'v') {
-		fprintf(stderr, "dokanctl : %s %s\n", __DATE__, __TIME__);
-		fprintf(stderr, "Dokan version : %d\n", DokanVersion());
-		fprintf(stderr, "Dokan driver version : 0x%X\n", DokanDriverVersion());
+		fprintf(stderr, "fuserctl : %s %s\n", __DATE__, __TIME__);
+		fprintf(stderr, "Fuser version : %d\n", FuserVersion());		
+		fprintf(stderr, "Fuser driver version : 0x%X\n", FuserDriverVersion());		
 		return 0;
-	
+
 	} else if (GetOption(argc, argv, 1) == L'm') {
 		return ShowMountList();
-
 	} else if (GetOption(argc, argv, 1) == L'u' && argc == 3) {
 		return Unmount(argv[2], FALSE);
-
 	} else if (GetOption(argc, argv, 1) == L'u' &&
 				GetOption(argc, argv, 3) == L'f' && argc == 4) {
 		return Unmount(argv[2], TRUE);
@@ -174,7 +181,7 @@ wmain(int argc, PWCHAR argv[])
 	switch(towlower(argv[1][1])) {
 	case L'i':
 		if (type ==  L'd') {
-			if (DokanServiceInstall(DOKAN_DRIVER_SERVICE,
+			if (FuserServiceInstall(FUSER_DRIVER_SERVICE,
 									SERVICE_FILE_SYSTEM_DRIVER,
 									driverFullPath))
 				fprintf(stderr, "driver install ok\n");
@@ -182,7 +189,7 @@ wmain(int argc, PWCHAR argv[])
 				fprintf(stderr, "driver install failed\n");
 
 		} else if (type == L's') {
-			if (DokanServiceInstall(DOKAN_MOUNTER_SERVICE,
+			if (FuserServiceInstall(FUSER_MOUNTER_SERVICE,
 									SERVICE_WIN32_OWN_PROCESS,
 									mounterFullPath))
 				fprintf(stderr, "mounter install ok\n");
@@ -190,21 +197,21 @@ wmain(int argc, PWCHAR argv[])
 				fprintf(stderr, "mounter install failed\n");
 		
 		} else if (type == L'a') {
-			if (DokanServiceInstall(DOKAN_DRIVER_SERVICE,
+			if (FuserServiceInstall(FUSER_DRIVER_SERVICE,
 									SERVICE_FILE_SYSTEM_DRIVER,
 									driverFullPath))
 				fprintf(stderr, "driver install ok\n");
 			else
 				fprintf(stderr, "driver install failed\n");
 
-			if (DokanServiceInstall(DOKAN_MOUNTER_SERVICE,
+			if (FuserServiceInstall(FUSER_MOUNTER_SERVICE,
 									SERVICE_WIN32_OWN_PROCESS,
 									mounterFullPath))
 				fprintf(stderr, "mounter install ok\n");
 			else
 				fprintf(stderr, "mounter install failed\n");
 		} else if (type == L'n') {
-			if (DokanNetworkProviderInstall())
+			if (FuserNetworkProviderInstall())
 				fprintf(stderr, "network provider install ok\n");
 			else
 				fprintf(stderr, "network provider install failed\n");
@@ -213,29 +220,29 @@ wmain(int argc, PWCHAR argv[])
 
 	case L'r':
 		if (type == L'd') {
-			if (DokanServiceDelete(DOKAN_DRIVER_SERVICE))
+			if (FuserServiceDelete(FUSER_DRIVER_SERVICE))
 				fprintf(stderr, "driver remove ok\n");
 			else
 				fprintf(stderr, "driver remvoe failed\n");
 		
 		} else if (type == L's') {
-			if (DokanServiceDelete(DOKAN_MOUNTER_SERVICE))
+			if (FuserServiceDelete(FUSER_MOUNTER_SERVICE))
 				fprintf(stderr, "mounter remove ok\n");
 			else
 				fprintf(stderr, "mounter remvoe failed\n");	
 		
 		} else if (type == L'a') {
-			if (DokanServiceDelete(DOKAN_MOUNTER_SERVICE))
+			if (FuserServiceDelete(FUSER_MOUNTER_SERVICE))
 				fprintf(stderr, "mounter remove ok\n");
 			else
 				fprintf(stderr, "mounter remvoe failed\n");	
 
-			if (DokanServiceDelete(DOKAN_DRIVER_SERVICE))
+			if (FuserServiceDelete(FUSER_DRIVER_SERVICE))
 				fprintf(stderr, "driver remove ok\n");
 			else
 				fprintf(stderr, "driver remvoe failed\n");
 		} else if (type == L'n') {
-			if (DokanNetworkProviderUninstall())
+			if (FuserNetworkProviderUninstall())
 				fprintf(stderr, "network provider remove ok\n");
 			else
 				fprintf(stderr, "network provider remove failed\n");
@@ -244,7 +251,7 @@ wmain(int argc, PWCHAR argv[])
 	case L'd':
 		if (L'0' <= type && type <= L'9') {
 			ULONG mode = type - L'0';
-			if (DokanSetDebugMode(mode)) {
+			if (FuserSetDebugMode(mode)) {
 				fprintf(stderr, "set debug mode ok\n");
 			} else {
 				fprintf(stderr, "set debug mode failed\n");
@@ -254,8 +261,13 @@ wmain(int argc, PWCHAR argv[])
 	default:
 		fprintf(stderr, "unknown option\n");
 	}
-	
 
 	return 0;
 }
+
+/* TODO: Unused code, can be removed
+//#include <stdlib.h>
+//#include <locale.h>
+*/
+
 

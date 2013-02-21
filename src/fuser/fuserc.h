@@ -27,23 +27,11 @@ extern "C" {
 #endif
 
 
-
-// TODO: Remove these codes
-/*
-#define FUSER_MOUNTER_SERVICE L"FuserMounter"
-#define FUSER_DRIVER_SERVICE L"Fuser"
-#define FUSER_CONTROL_CHECK		3
-#define FUSER_CONTROL_FIND		4
-#define FUSER_CONTROL_LIST		5
-#define FUSER_CONTROL_OPTION_FORCE_UNMOUNT 1
-#define FUSER_CONTROL_SUCCESS	1
-*/
-
-
-
 #define FUSER_MOUNT_POINT_SUPPORTED_VERSION 600 // TODO: Remove this
 #define FUSER_SECURITY_SUPPORTED_VERSION	600 // TODO: Remove this
 
+#define FUSER_DRIVER_SERVICE L"Fuser"			// TODO: used by fuserctrl
+#define FUSER_MOUNTER_SERVICE L"FuserMounter"   // TODO: used by fuserctrl
 
 #define FUSER_GLOBAL_DEVICE_NAME	L"\\\\.\\Fuser" // TODO: adapt at the opportunity
 #define FUSER_CONTROL_PIPE			L"\\\\.\\pipe\\FuserMounter"
@@ -55,8 +43,15 @@ extern "C" {
 #define FUSER_CONTROL_MOUNT		1
 #define FUSER_CONTROL_UNMOUNT	2
 
+#define FUSER_CONTROL_OPTION_FORCE_UNMOUNT 1
+
 
 #define FUSER_CONTROL_FAIL		0
+#define FUSER_CONTROL_SUCCESS	1 // used by mounter
+#define FUSER_CONTROL_CHECK		3 // TODO: check what this is supposed to do and possibly remove it, used by mounter
+#define FUSER_CONTROL_FIND		4 // TODO: check what this is supposed to do and possibly remove it, used by mounter
+#define FUSER_CONTROL_LIST		5 // used by mounter
+
 
 
 #define FUSER_SERVICE_START		1

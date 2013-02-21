@@ -5,7 +5,7 @@ C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
 
 USE_MSVCRT=1
 
-INCLUDES=..\sys;..\dokan
+INCLUDES=..\sys;..\fuser
 
 
 SOURCES=mount.c \

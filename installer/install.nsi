@@ -4,10 +4,10 @@
 !include x64.nsh
 !include WinVer.nsh
 
-Name "DokanLibraryInstaller ${VERSION}"
-OutFile "DokanInstall_${VERSION}.exe"
+Name "FuserLibraryInstaller ${VERSION}"
+OutFile "FuserInstall_${VERSION}.exe"
 
-InstallDir $PROGRAMFILES32\Dokan\DokanLibrary
+InstallDir $PROGRAMFILES32\Fuser\FuserLibrary
 RequestExecutionLevel admin
 LicenseData "licdata.rtf"
 ShowUninstDetails show
@@ -22,80 +22,80 @@ UninstPage instfiles
 
 !macro X86Files os
 
-  SetOutPath $PROGRAMFILES32\Dokan\DokanLibrary
+  SetOutPath $PROGRAMFILES32\Fuser\FuserLibrary
  
-    File ..\dokan\readme.txt
-    File ..\dokan\readme.ja.txt
-    File ..\dokan\dokan.h
+    File ..\fuser\readme.txt
+    File ..\fuser\readme.ja.txt
+    File ..\fuser\fuser.h
     File ..\license.gpl.txt
     File ..\license.lgpl.txt
     File ..\license.mit.txt
-    File ..\dokan\objchk_${os}_x86\i386\dokan.lib
-    File ..\dokan_control\objchk_${os}_x86\i386\dokanctl.exe
-    File ..\dokan_mount\objchk_${os}_x86\i386\mounter.exe
+    File ..\fuser\objchk_${os}_x86\i386\fuser.lib
+    File ..\fuser_control\objchk_${os}_x86\i386\fuserctl.exe
+    File ..\fuser_mount\objchk_${os}_x86\i386\mounter.exe
 
-  SetOutPath $PROGRAMFILES32\Dokan\DokanLibrary\sample\mirror
+  SetOutPath $PROGRAMFILES32\Fuser\FuserLibrary\sample\mirror
 
-    File ..\dokan_mirror\makefile
-    File ..\dokan_mirror\mirror.c
-    File ..\dokan_mirror\sources
-    File ..\dokan_mirror\objchk_${os}_x86\i386\mirror.exe
+    File ..\fuser_mirror\makefile
+    File ..\fuser_mirror\mirror.c
+    File ..\fuser_mirror\sources
+    File ..\fuser_mirror\objchk_${os}_x86\i386\mirror.exe
 
   SetOutPath $SYSDIR
 
-    File ..\dokan\objchk_${os}_x86\i386\dokan.dll
+    File ..\fuser\objchk_${os}_x86\i386\fuser.dll
 
 !macroend
 
 /*
 !macro X64Files os
 
-  SetOutPath $PROGRAMFILES64\Dokan\DokanLibrary
+  SetOutPath $PROGRAMFILES64\Fuser\FuserLibrary
 
-    File ..\dokan\readme.txt
-    File ..\dokan\readme.ja.txt
-    File ..\dokan\dokan.h
+    File ..\fuser\readme.txt
+    File ..\fuser\readme.ja.txt
+    File ..\fuser\fuser.h
     File ..\license.gpl.txt
     File ..\license.lgpl.txt
     File ..\license.mit.txt
-    File ..\dokan\objchk_${os}_amd64\amd64\dokan.lib
-    File ..\dokan_control\objchk_${os}_amd64\amd64\dokanctl.exe
-    File ..\dokan_mount\objchk_${os}_amd64\amd64\mounter.exe
+    File ..\fuser\objchk_${os}_amd64\amd64\fuser.lib
+    File ..\fuser_control\objchk_${os}_amd64\amd64\fuserctl.exe
+    File ..\fuser_mount\objchk_${os}_amd64\amd64\mounter.exe
 
-  SetOutPath $PROGRAMFILES64\Dokan\DokanLibrary\sample\mirror
+  SetOutPath $PROGRAMFILES64\Fuser\FuserLibrary\sample\mirror
 
-    File ..\dokan_mirror\makefile
-    File ..\dokan_mirror\mirror.c
-    File ..\dokan_mirror\sources
-    File ..\dokan_mirror\objchk_${os}_amd64\amd64\mirror.exe
+    File ..\fuser_mirror\makefile
+    File ..\fuser_mirror\mirror.c
+    File ..\fuser_mirror\sources
+    File ..\fuser_mirror\objchk_${os}_amd64\amd64\mirror.exe
 
   ${DisableX64FSRedirection}
 
   SetOutPath $SYSDIR
 
-    File ..\dokan\objchk_${os}_amd64\amd64\dokan.dll
+    File ..\fuser\objchk_${os}_amd64\amd64\fuser.dll
 
   ${EnableX64FSRedirection}
 
 !macroend
 */
 
-!macro DokanSetup
-  ExecWait '"$PROGRAMFILES32\Dokan\DokanLibrary\dokanctl.exe" /i a' $0
-  DetailPrint "dokanctl returned $0"
-  WriteUninstaller $PROGRAMFILES32\Dokan\DokanLibrary\DokanUninstall.exe
+!macro FuserSetup
+  ExecWait '"$PROGRAMFILES32\Fuser\FuserLibrary\fuserctl.exe" /i a' $0
+  DetailPrint "fuserctl returned $0"
+  WriteUninstaller $PROGRAMFILES32\Fuser\FuserLibrary\FuserUninstall.exe
 
   ; Write the uninstall keys for Windows
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DokanLibrary" "DisplayName" "Dokan Library ${VERSION}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DokanLibrary" "UninstallString" '"$PROGRAMFILES32\Dokan\DokanLibrary\DokanUninstall.exe"'
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DokanLibrary" "NoModify" 1
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DokanLibrary" "NoRepair" 1
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserLibrary" "DisplayName" "Fuser Library ${VERSION}"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserLibrary" "UninstallString" '"$PROGRAMFILES32\Fuser\FuserLibrary\FuserUninstall.exe"'
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserLibrary" "NoModify" 1
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserLibrary" "NoRepair" 1
 
 !macroend
 
 !macro X86Driver os
   SetOutPath $SYSDIR\drivers
-    File ..\sys\objchk_${os}_x86\i386\dokan.sys
+    File ..\sys\objchk_${os}_x86\i386\fuser.sys
 !macroend
 
 !macro X64Driver os
@@ -103,13 +103,13 @@ UninstPage instfiles
 
   SetOutPath $SYSDIR\drivers
 
-    File ..\sys\objchk_${os}_amd64\amd64\dokan.sys
+    File ..\sys\objchk_${os}_amd64\amd64\fuser.sys
 
   ${EnableX64FSRedirection}
 !macroend
 
 
-Section "Dokan Library x86" section_x86
+Section "Fuser Library x86" section_x86
   ${If} ${IsWin7}
     !insertmacro X86Files "win7"
   ${ElseIf} ${IsWin2008R2}
@@ -125,7 +125,7 @@ Section "Dokan Library x86" section_x86
   ${EndIf}
 SectionEnd
 
-Section "Dokan Driver x86" section_x86_driver
+Section "Fuser Driver x86" section_x86_driver
   ${If} ${IsWin7}
     !insertmacro X86Driver "win7"
   ${ElseIf} ${IsWinVista}
@@ -137,10 +137,10 @@ Section "Dokan Driver x86" section_x86_driver
   ${ElseIf} ${IsWinXp}
     !insertmacro X86Driver "wxp"
   ${EndIf}
-  !insertmacro DokanSetup
+  !insertmacro FuserSetup
 SectionEnd
 
-Section "Dokan Driver x64" section_x64_driver
+Section "Fuser Driver x64" section_x64_driver
   ${If} ${IsWin7}
     !insertmacro X64Driver "win7"
   ${ElseIf} ${IsWin2008R2}
@@ -152,11 +152,11 @@ Section "Dokan Driver x64" section_x64_driver
   ${ElseIf} ${IsWin2003}
     !insertmacro X64Driver "wnet"
   ${EndIf}
-  !insertmacro DokanSetup
+  !insertmacro FuserSetup
 SectionEnd
 
 /*
-Section "Dokan Library x64" section_x64
+Section "Fuser Library x64" section_x64
   ${If} ${IsWin7}
     !insertmacro X64Files "win7"
   ${ElseIf} ${IsWinVista}
@@ -170,23 +170,23 @@ SectionEnd
 */
 
 Section "Uninstall"
-  ExecWait '"$PROGRAMFILES32\Dokan\DokanLibrary\dokanctl.exe" /r a' $0
-  DetailPrint "dokanctl.exe returned $0"
+  ExecWait '"$PROGRAMFILES32\Fuser\FuserLibrary\fuserctl.exe" /r a' $0
+  DetailPrint "fuserctl.exe returned $0"
 
-  RMDir /r $PROGRAMFILES32\Dokan\DokanLibrary
-  RMDir $PROGRAMFILES32\Dokan
-  Delete $SYSDIR\dokan.dll
+  RMDir /r $PROGRAMFILES32\Fuser\FuserLibrary
+  RMDir $PROGRAMFILES32\Fuser
+  Delete $SYSDIR\fuser.dll
 
   ${If} ${RunningX64}
     ${DisableX64FSRedirection}
-      Delete $SYSDIR\drivers\dokan.sys
+      Delete $SYSDIR\drivers\fuser.sys
     ${EnableX64FSRedirection}
   ${Else}
-    Delete $SYSDIR\drivers\dokan.sys
+    Delete $SYSDIR\drivers\fuser.sys
   ${EndIf}
 
   ; Remove registry keys
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\DokanLibrary"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserLibrary"
 
   IfSilent noreboot
     MessageBox MB_YESNO "A reboot is required to finish the uninstallation. Do you wish to reboot now?" IDNO noreboot
@@ -217,7 +217,7 @@ Function .onInit
     ${ElseIf} ${IsWin2008R2}
     ${ElseIf} ${IsWin7}
     ${Else}
-      MessageBox MB_OK "Your OS is not supported. Dokan library supports Windows 2003, Vista, 2008, 2008R2 and 7 for x64."
+      MessageBox MB_OK "Your OS is not supported. Fuser library supports Windows 2003, Vista, 2008, 2008R2 and 7 for x64."
       Abort
     ${EndIf}
   ${Else}
@@ -227,7 +227,7 @@ Function .onInit
     ${ElseIf} ${IsWin2008}
     ${ElseIf} ${IsWin7}
     ${Else}
-      MessageBox MB_OK "Your OS is not supported. Dokan library supports Windows XP, 2003, Vista, 2008 and 7 for x86."
+      MessageBox MB_OK "Your OS is not supported. Fuser library supports Windows XP, 2003, Vista, 2008 and 7 for x86."
       Abort
     ${EndIf}
   ${EndIf}
@@ -235,7 +235,7 @@ Function .onInit
   ; Previous version
   ${If} ${RunningX64}
     ${DisableX64FSRedirection}
-      IfFileExists $SYSDIR\drivers\dokan.sys HasPreviousVersionX64 NoPreviousVersionX64
+      IfFileExists $SYSDIR\drivers\fuser.sys HasPreviousVersionX64 NoPreviousVersionX64
       ; To make EnableX64FSRedirection called in both cases, needs duplicated MessageBox code. How can I avoid this?
       HasPreviousVersionX64:
         MessageBox MB_OK "Please unstall the previous version and restart your computer before running this installer."
@@ -243,7 +243,7 @@ Function .onInit
       NoPreviousVersionX64:
     ${EnableX64FSRedirection}
   ${Else}
-    IfFileExists $SYSDIR\drivers\dokan.sys HasPreviousVersion NoPreviousVersion
+    IfFileExists $SYSDIR\drivers\fuser.sys HasPreviousVersion NoPreviousVersion
     HasPreviousVersion:
       MessageBox MB_OK "Please unstall the previous version and restart your computer before running this installer."
       Abort
@@ -255,7 +255,7 @@ FunctionEnd
 
 Function .onInstSuccess
   IfSilent noshellopen
-    ExecShell "open" "$PROGRAMFILES32\Dokan\DokanLibrary"
+    ExecShell "open" "$PROGRAMFILES32\Fuser\FuserLibrary"
   noshellopen:
 FunctionEnd
 

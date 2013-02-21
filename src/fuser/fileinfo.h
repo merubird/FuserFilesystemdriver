@@ -20,6 +20,14 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #ifndef _FILEINFO_H_
 #define _FILEINFO_H_
 
+
+#define ALIGN_DOWN(length, type)    ((ULONG)(length) & ~(sizeof(type) - 1))
+#define ALIGN_UP(length, type)      (ALIGN_DOWN(((ULONG)(length) + sizeof(type) - 1), type))
+#define QuadAlign(Val)              (ALIGN_UP( Val, ULONGLONG ))
+
+
+
+
 // TODO: Support of further error codes:
 #define STATUS_SUCCESS				   	(ULONG)0
 #define STATUS_NO_MORE_FILES            ((ULONG)0x80000006L)
@@ -460,53 +468,7 @@ typedef struct _FILE_VALID_DATA_LENGTH_INFORMATION {
 } FILE_VALID_DATA_LENGTH_INFORMATION, *PFILE_VALID_DATA_LENGTH_INFORMATION;
 
 
-
-
-
-
-// TODO: Check which of these are really needed
-#define ALIGN_DOWN(length, type) \
-    ((ULONG)(length) & ~(sizeof(type) - 1))
-
-#define ALIGN_UP(length, type) \
-    (ALIGN_DOWN(((ULONG)(length) + sizeof(type) - 1), type))
-
-#define ALIGN_DOWN_POINTER(address, type) \
-    ((PVOID)((ULONG_PTR)(address) & ~((ULONG_PTR)sizeof(type) - 1)))
-
-#define ALIGN_UP_POINTER(address, type) \
-    (ALIGN_DOWN_POINTER(((ULONG_PTR)(address) + sizeof(type) - 1), type))
-
-
-#define WordAlign(Val) (                    \
-    ALIGN_UP( Val, WORD )                   \
-    )
-
-#define WordAlignPtr(Ptr) (                 \
-    ALIGN_UP_POINTER( Ptr, WORD )           \
-    )
-
-#define LongAlign(Val) (                    \
-    ALIGN_UP( Val, LONG )                   \
-    )
-
-#define LongAlignPtr(Ptr) (                 \
-    ALIGN_UP_POINTER( Ptr, LONG )           \
-    )
-
-#define QuadAlign(Val) (                    \
-    ALIGN_UP( Val, ULONGLONG )              \
-    )
-
-#define QuadAlignPtr(Ptr) (                 \
-    ALIGN_UP_POINTER( Ptr, ULONGLONG )      \
-    )
-
-#define IsPtrQuadAligned(Ptr) (           \
-    QuadAlignPtr(Ptr) == (PVOID)(Ptr)     \
-    )
 	
-
 
 #endif // _FILEINFO_H_
 
@@ -578,6 +540,28 @@ typedef struct _FILE_FS_OBJECTID_INFORMATION {
     UCHAR ObjectId[16];
     UCHAR ExtendedInfo[48];
 } FILE_FS_OBJECTID_INFORMATION, *PFILE_FS_OBJECTID_INFORMATION;
+#define ALIGN_DOWN_POINTER(address, type) \
+    ((PVOID)((ULONG_PTR)(address) & ~((ULONG_PTR)sizeof(type) - 1)))
+#define ALIGN_UP_POINTER(address, type) \
+    (ALIGN_DOWN_POINTER(((ULONG_PTR)(address) + sizeof(type) - 1), type))
+#define WordAlign(Val) (                    \
+    ALIGN_UP( Val, WORD )                   \
+    )
+#define WordAlignPtr(Ptr) (                 \
+    ALIGN_UP_POINTER( Ptr, WORD )           \
+    )
+#define LongAlign(Val) (                    \
+    ALIGN_UP( Val, LONG )                   \
+    )
+#define LongAlignPtr(Ptr) (                 \
+    ALIGN_UP_POINTER( Ptr, LONG )           \
+    )
+#define QuadAlignPtr(Ptr) (                 \
+    ALIGN_UP_POINTER( Ptr, ULONGLONG )      \
+    )
+#define IsPtrQuadAligned(Ptr) (           \
+    QuadAlignPtr(Ptr) == (PVOID)(Ptr)     \
+    )
 */
 
 

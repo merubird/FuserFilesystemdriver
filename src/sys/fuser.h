@@ -623,7 +623,7 @@ FuserCompleteSetSecurity( // TODO: remove support for filesecurity
 
 
 
-/* TODO: Remove:
+/* TODO: no longer needed and can be removed
 	#define VOLUME_LABEL  FUSER_DEFAULT_VOLUME_LABEL	
 	
 
@@ -653,7 +653,6 @@ FuserAllocateCCB(
 	__in PFuserDCB Dcb,
 	__in PFuserFCB	Fcb);
 
-	
 */
 
 #endif

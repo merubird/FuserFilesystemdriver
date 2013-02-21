@@ -1,4 +1,4 @@
-TARGETNAME=dokanctl
+TARGETNAME=fuserctl
 TARGETTYPE=PROGRAM
 
 UMENTRY=wmain
@@ -6,11 +6,11 @@ USE_MSVCRT=1
 
 C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
 
-INCLUDES=..\dokan
+INCLUDES=..\fuser
 
-LINKLIBS=..\dokan\$(O)\dokan.lib
+LINKLIBS=..\fuser\$(O)\fuser.lib
 
-SOURCES=dokanctl.c
+SOURCES=fuserctl.c
 
 UMTYPE=console
 UMBASE=0x400000

@@ -741,8 +741,6 @@ DispatchCommon(
 
 
 
-
-
 BOOL WINAPI DllMain(
 	HINSTANCE	Instance,
 	DWORD		Reason,
@@ -750,7 +748,7 @@ BOOL WINAPI DllMain(
 {
 	switch(Reason) {
 		case DLL_PROCESS_ATTACH:
-			{
+			{				
 #if _MSC_VER < 1300
 				InitializeCriticalSection(&g_InstanceCriticalSection);
 #else
@@ -761,7 +759,7 @@ BOOL WINAPI DllMain(
 			}
 			break;			
 		case DLL_PROCESS_DETACH:
-			{
+			{							
 				EnterCriticalSection(&g_InstanceCriticalSection);
 				while(!IsListEmpty(&g_InstanceList)) {
 					PLIST_ENTRY entry = RemoveHeadList(&g_InstanceList);
