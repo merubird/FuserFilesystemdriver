@@ -10,7 +10,9 @@ INCLUDES=..\fuser
 
 LINKLIBS=..\fuser\$(O)\fuser.lib $(SDK_LIB_PATH)\user32.lib 
 
-SOURCES=mirror.c
+SOURCES=mirror.c \
+		mirror.rc
+		
 
 UMTYPE=console
 UMBASE=0x400000

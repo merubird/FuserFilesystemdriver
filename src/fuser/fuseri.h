@@ -73,7 +73,6 @@ SendReleaseIRP(
 	LPCWSTR DeviceName);
 
 
-
 BOOL
 SendToDevice(
 	LPCWSTR	DeviceName,
@@ -88,14 +87,15 @@ SendToDevice(
 
 
 LPCWSTR
-GetRawDeviceName(LPCWSTR	DeviceName);
+GetRawDeviceName(LPCWSTR	DeviceName);	
 
 
 
 BOOL
 FuserMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName);
+	LPCWSTR	DeviceName,
+	BOOL    UseHeartbeatControl);
 
 
 DWORD WINAPI

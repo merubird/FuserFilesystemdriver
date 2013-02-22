@@ -542,13 +542,17 @@ FuserMain(PFUSER_OPTIONS FuserOptions, PFUSER_OPERATIONS FuserOperations)
 	if (!FuserStart(instance)) {
 		return FUSER_START_ERROR;
 	}
-
-	if (!FuserMount(instance->MountPoint, instance->DeviceName)) {
+	
+	if (!FuserMount(instance->MountPoint, instance->DeviceName,  FuserOptions->Options & FUSER_OPTION_HEARTBEAT  )) {
 		SendReleaseIRP(instance->DeviceName);
 		FuserDbgPrint("Fuser Error: DefineDosDevice Failed\n");
 		return FUSER_MOUNT_ERROR;
 	}
-
+		
+	if (FuserOperations->Mount) {
+		FuserOperations->Mount(instance->MountPoint, instance->DeviceName);
+	}
+	
 	DbgPrintW(L"mounted: %s -> %s\n", instance->MountPoint, instance->DeviceName);
 
 	if (FuserOptions->Options & FUSER_OPTION_KEEP_ALIVE) {

@@ -38,9 +38,15 @@ extern "C" {
 typedef struct _MOUNT_ENTRY {
 	LIST_ENTRY		ListEntry;
 	FUSER_CONTROL	MountControl;
+	
+	//Heartbeat:
+	BOOL			HeartbeatActive;
+	HANDLE			HeartbeatThread;	
+	BOOL			HeartbeatSignal;
+	BOOL			HeartbeatAbort;
+	
+	
 } MOUNT_ENTRY, *PMOUNT_ENTRY;
-
-
 
 
 
@@ -53,6 +59,22 @@ FuserControlMount(
 BOOL
 FuserControlUnmount(
 	LPCWSTR MountPoint);	
+
+VOID
+HeartbeatStart(PMOUNT_ENTRY mount);
+
+VOID
+HeartbeatStop(PMOUNT_ENTRY mount);
+
+VOID
+HeartbeatSetAliveSignal(PMOUNT_ENTRY mount);
+
+VOID
+SendReleaseIRP(
+	LPCWSTR	DeviceName);
+
+VOID
+RemoveMountEntry(PMOUNT_ENTRY MountEntry);
 
 
 #ifdef __cplusplus

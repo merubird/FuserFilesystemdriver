@@ -40,8 +40,9 @@ extern "C" {
 #define FUSER_MAX_THREAD		15
 
 
-#define FUSER_CONTROL_MOUNT		1
-#define FUSER_CONTROL_UNMOUNT	2
+#define FUSER_CONTROL_MOUNT			1
+#define FUSER_CONTROL_UNMOUNT		2
+#define FUSER_CONTROL_HEARTBEAT		88 // TODO: Arrange values meaningful, clearly define what return values are and what commands are
 
 #define FUSER_CONTROL_OPTION_FORCE_UNMOUNT 1
 

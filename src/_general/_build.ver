@@ -1,0 +1,4 @@
+;BuildVersion  
+#define VER_YEAR "2013"   
+#define VER_ARCH "64bit"   
+#define VER_BUILDDEBUG " "   

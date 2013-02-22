@@ -1,0 +1,43 @@
+﻿using System;
+
+using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Runtime.InteropServices;
+
+namespace FuserNet
+{
+    internal class ACLProxy
+    {
+        // TODO: Remove support for ACL completely
+        [DllImport("advapi32.dll")]
+        private static extern int GetFileSecurity(string lpFileName, FuserLowlevelDriver.FuserDefinition.SECURITY_INFORMATION RequestedInformation, [MarshalAs(UnmanagedType.Struct)] ref FuserLowlevelDriver.FuserDefinition.SECURITY_DESCRIPTOR pSecurityDescriptor, int nLength, ref uint lpnLengthNeeded);
+        private string filename;
+
+        public ACLProxy() {            
+            this.filename = "";
+
+            try {
+                this.filename = System.Environment.GetFolderPath(System.Environment.SpecialFolder.CommonDocuments);
+            } catch {
+                this.filename = "";
+            }
+
+            if (this.filename == "") {
+                this.filename = Path.GetTempPath();
+            }
+
+        }
+
+        public int GetFileSecurity(FuserLowlevelDriver.FuserDefinition.SECURITY_INFORMATION RequestedInformation, [MarshalAs(UnmanagedType.Struct)] ref FuserLowlevelDriver.FuserDefinition.SECURITY_DESCRIPTOR pSecurityDescriptor, int nLength, ref uint lpnLengthNeeded) {
+            if (this.filename == null)
+                return -1;
+            if (this.filename == "")
+                return -1;
+
+            return GetFileSecurity(this.filename, RequestedInformation, ref pSecurityDescriptor, nLength, ref lpnLengthNeeded);
+        }
+
+
+    }
+}

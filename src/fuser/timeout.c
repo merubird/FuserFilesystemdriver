@@ -69,6 +69,25 @@ FuserResetTimeout(ULONG Timeout, PFUSER_FILE_INFO FileInfo)
 
 
 
+BOOL FUSERAPI
+FuserSendHeartbeat(
+	LPCWSTR MountPoint,
+	LPCWSTR DeviceName
+) {
+	FUSER_CONTROL control;
+	BOOL	status = FALSE;
+
+	ZeroMemory(&control, sizeof(FUSER_CONTROL));
+	control.Type = FUSER_CONTROL_HEARTBEAT;
+
+	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
+	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
+
+	status = FuserMountControl(&control);
+	
+	return status;
+}
+
 
 
 

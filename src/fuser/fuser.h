@@ -17,6 +17,9 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// TODO: Check Fuser.def exports and check which are no longer needed, remove them in FuserNet as well.
+
+// TODO: FuserUnmount = is this method really still used?
 
 #ifndef _FUSER_H_
 #define _FUSER_H_
@@ -40,33 +43,39 @@ extern "C" {
 #define FUSER_CALLBACK __stdcall
 
 
-
-#define FUSER_OPTION_DEBUG		1 // ouput debug message
-#define FUSER_OPTION_STDERR		2 // ouput debug message to stderr
-#define FUSER_OPTION_ALT_STREAM	4 // use alternate stream
-#define FUSER_OPTION_KEEP_ALIVE	8 // use auto unmount
-#define FUSER_OPTION_NETWORK	16 // use network drive, you need to install Fuser network provider.
-#define FUSER_OPTION_REMOVABLE	32 // use removable drive
+// <- C#.Net Library ->
+	#define FUSER_OPTION_DEBUG		1   // ouput debug message
+	#define FUSER_OPTION_STDERR		2   // ouput debug message to stderr
+	#define FUSER_OPTION_ALT_STREAM	4   // use alternate stream
+	#define FUSER_OPTION_KEEP_ALIVE	8   // use auto unmount
+	#define FUSER_OPTION_NETWORK	16  // use network drive, you need to install Fuser network provider.
+	#define FUSER_OPTION_REMOVABLE	32  // use removable drive
+	#define FUSER_OPTION_HEARTBEAT	256 // use heartbeat control
+// <- C#.Net Library ->
 
 
 
 // The current Fuser version (ver 0.6.0). Please set this constant on FuserOptions->Version.
-#define FUSER_VERSION		600 // TODO: Adjust values
+#define FUSER_VERSION		600 // TODO: Adjust values       <- C#.Net Library ->
+// TODO: Revise version system, which data type should be used, how are versions ordered?
+
 
 
 // TODO: Adjust name
-#define FUSER_SUCCESS				 0
-#define FUSER_ERROR					-1 /* General Error */
-#define FUSER_DRIVE_LETTER_ERROR	-2 /* Bad Drive letter */
-#define FUSER_DRIVER_INSTALL_ERROR	-3 /* Can't install driver */
-#define FUSER_START_ERROR			-4 /* Driver something wrong */
-#define FUSER_MOUNT_ERROR			-5 /* Can't assign a drive letter or mount point */
-#define FUSER_MOUNT_POINT_ERROR		-6 /* Mount point is invalid */
+// <- C#.Net Library ->
+	#define FUSER_SUCCESS				 0
+	#define FUSER_ERROR					-1 /* General Error */
+	#define FUSER_DRIVE_LETTER_ERROR	-2 /* Bad Drive letter */
+	#define FUSER_DRIVER_INSTALL_ERROR	-3 /* Can't install driver */
+	#define FUSER_START_ERROR			-4 /* Driver something wrong */
+	#define FUSER_MOUNT_ERROR			-5 /* Can't assign a drive letter or mount point */
+	#define FUSER_MOUNT_POINT_ERROR		-6 /* Mount point is invalid */
+// <- C#.Net Library ->
 
 
 
-
-typedef struct _FUSER_OPTIONS {
+// TODO: Adapt name also in fuser.dll and FuserNet
+typedef struct _FUSER_OPTIONS {  // <- C#.Net Library ->
 	USHORT	Version; // Supported Fuser Version, ex. "530" (Fuser ver 0.5.3)
 	USHORT	ThreadCount; // number of threads to be used
 	ULONG	Options;	 // combination of FUSER_OPTIONS_*
@@ -76,7 +85,9 @@ typedef struct _FUSER_OPTIONS {
 
 
 
-typedef struct _FUSER_FILE_INFO {
+// TODO: Adapt name also in fuser.dll and FuserNet
+// TODO: Also revise function, what is really used
+typedef struct _FUSER_FILE_INFO {   // <- C#.Net Library ->
 	ULONG64	Context;      // FileSystem can use this variable
 	ULONG64	FuserContext; // Don't touch this
 	PFUSER_OPTIONS FuserOptions; // A pointer to FUSER_OPTIONS which was  passed to FuserMain.
@@ -99,8 +110,8 @@ typedef int (WINAPI *PFillFindData) (PWIN32_FIND_DATAW, PFUSER_FILE_INFO);
 
 
 
-
-typedef struct _FUSER_OPERATIONS {
+// TODO: Adapt name also in fuser.dll and FuserNet
+typedef struct _FUSER_OPERATIONS { // <- C#.Net Library ->
 	// When an error occurs, return negative value.
 	// Usually you should return GetLastError() * -1.
 
@@ -170,6 +181,7 @@ typedef struct _FUSER_OPERATIONS {
 		PFUSER_FILE_INFO);  //  (see PFillFindData definition)
 
 
+		// TODO: FindFilesWithPattern remove, as not used
 	// You should implement either FindFiles or FindFilesWithPattern
 	int (FUSER_CALLBACK *FindFilesWithPattern) (
 		LPCWSTR,			// PathName
@@ -266,9 +278,15 @@ typedef struct _FUSER_OPERATIONS {
 		DWORD,	// FileSystemNameSize in num of chars
 		PFUSER_FILE_INFO);
 
+	int (FUSER_CALLBACK *Mount) (
+		LPCWSTR, // MountPoint
+		LPCWSTR  // DeviceName
+		);		
 
 	int (FUSER_CALLBACK *Unmount) (
 		PFUSER_FILE_INFO);
+		
+	
 
 
 	// Suported since 0.6.0. You must specify the version at FUSER_OPTIONS.Version.
@@ -340,6 +358,9 @@ FuserResetTimeout(
 	PFUSER_FILE_INFO	FuserFileInfo);
 
 	
+//Sends the heartbeat signal
+BOOL FUSERAPI
+FuserSendHeartbeat(LPCWSTR MountPoint, LPCWSTR DeviceName);
 	
 
 // Get the handle to Access Token
@@ -349,8 +370,14 @@ HANDLE FUSERAPI
 FuserOpenRequestorToken(
 	PFUSER_FILE_INFO	FuserFileInfo);	
 	
+
+
+	
 	
 VOID DebugLogWrite(LPCWSTR z); // TODO: remove this
+
+
+
 
 /*
 // Obsolete and removed:

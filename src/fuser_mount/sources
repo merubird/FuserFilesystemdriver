@@ -9,7 +9,9 @@ INCLUDES=..\sys;..\fuser
 
 
 SOURCES=mount.c \
-		mounter.c
+		mounter.c \
+		heartbeat.c \
+		mount.rc
 
 UMTYPE=windows
 UMBASE=0x400000

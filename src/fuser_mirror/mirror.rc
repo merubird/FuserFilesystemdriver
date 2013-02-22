@@ -11,15 +11,11 @@
 
 // ---------------------------------------------------------------------
 
-#define VER_FILETYPE    			VFT_DRV
-#define VER_FILESUBTYPE 			VFT2_DRV_SYSTEM
-#define VER_TITEL                   "Kernelmode Driver"
-#define VER_INTERNALNAME_STR        "fuser.sys"
+#define VER_FILETYPE    			VFT_APP
+#define VER_FILESUBTYPE 			VFT2_UNKNOWN
+#define VER_TITEL                   "Mirror"
+#define VER_INTERNALNAME_STR        "mirror.exe"
 
-
+//MAIN               ICON    DISCARDABLE     "TESTVER.ICO"
 
 #include "..\_general\general.ver"
-
-
-
-

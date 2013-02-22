@@ -10,7 +10,8 @@ INCLUDES=..\fuser
 
 LINKLIBS=..\fuser\$(O)\fuser.lib
 
-SOURCES=fuserctl.c
+SOURCES=fuserctl.c \
+		fuserctl.rc
 
 UMTYPE=console
 UMBASE=0x400000

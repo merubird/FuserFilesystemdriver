@@ -351,12 +351,17 @@ FuserServiceDelete(
 BOOL
 FuserMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName)
+	LPCWSTR	DeviceName,
+	BOOL    UseHeartbeatControl)
 {
 	FUSER_CONTROL control;
 
 	ZeroMemory(&control, sizeof(FUSER_CONTROL));
 	control.Type = FUSER_CONTROL_MOUNT;
+	control.Option = 0;
+	if (UseHeartbeatControl){
+		control.Option = 1;
+	}
 
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);

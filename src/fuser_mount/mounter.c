@@ -224,9 +224,14 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 
 		DbgPrintW(L"FuserControl Mount\n");
 
-		if (FuserControlMount(Control->MountPoint, Control->DeviceName)) {
+		
+		if (FuserControlMount(Control->MountPoint, Control->DeviceName )) {			
 			Control->Status = FUSER_CONTROL_SUCCESS;
-			InsertMountEntry(Control);
+			mountEntry = InsertMountEntry(Control);
+			if (Control->Option == 1) {
+				// enable heartbeat-control:
+				HeartbeatStart(mountEntry);
+			}			
 		} else {
 			Control->Status = FUSER_CONTROL_FAIL;
 		}
@@ -254,6 +259,7 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 				wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
 						mountEntry->MountControl.DeviceName);
 			}
+			HeartbeatStop(mountEntry);
 			RemoveMountEntry(mountEntry);
 		} else {
 			mountEntry->MountControl.Status = FUSER_CONTROL_FAIL;
@@ -279,6 +285,18 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 			FuserControlList(Control);
 		}
 		break;
+	
+	case FUSER_CONTROL_HEARTBEAT:
+		{			
+			mountEntry = FindMountEntry(Control);
+			if (mountEntry == NULL) {
+				Control->Status = FUSER_CONTROL_FAIL;
+				break;	
+			}
+			HeartbeatSetAliveSignal(mountEntry);
+			Control->Status = FUSER_CONTROL_SUCCESS;
+		}
+		break;
 
 	default:
 		DbgPrintW(L"FuserControl UnknownType %u\n", Control->Type);
@@ -286,6 +304,56 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 	return;
 }
 
+
+
+VOID
+UnmountAll()
+{
+	PLIST_ENTRY		listEntry;
+	PMOUNT_ENTRY	mountEntry;
+	PMOUNT_ENTRY	umEntry;
+	ULONG			index = 0;
+	FUSER_CONTROL 	control;
+
+	while(1){		
+		umEntry = NULL;
+		
+		
+		EnterCriticalSection(&g_CriticalSection);
+		for (listEntry = g_MountList.Flink;
+			listEntry != &g_MountList;
+			listEntry = listEntry->Flink) {
+			mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
+			if (mountEntry != NULL) {
+				umEntry = mountEntry;
+				break;
+			}
+		}
+		LeaveCriticalSection(&g_CriticalSection);
+		
+		
+		if (umEntry == NULL){
+			break;
+		} else {
+			ZeroMemory(&control, sizeof(FUSER_CONTROL));
+			control.Type = FUSER_CONTROL_UNMOUNT;
+						
+			wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), umEntry->MountControl.DeviceName);
+			wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), umEntry->MountControl.MountPoint);
+		
+			FuserControl(&control);
+			if (control.Status == FUSER_CONTROL_SUCCESS){
+				SendReleaseIRP(control.DeviceName);
+			} else {
+				break;
+			}
+		}
+		
+		
+	}
+	
+
+}
 
 
 
@@ -408,12 +476,13 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 				}
 			}
 
-		} else if (eventNo == 2) {
+		} else if (eventNo == 2) {		
+			UnmountAll(); // Removes all mounts before terminating
+		
 			DbgPrintW(L"FuserMounter: stop mounter service\n");
 			g_ServiceStatus.dwWaitHint     = 0;
 			g_ServiceStatus.dwCheckPoint   = 0;
-			g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;
-			// TODO: before remove all mounts
+			g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;			
 			SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
 
 			break;

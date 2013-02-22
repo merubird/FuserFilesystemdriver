@@ -28,7 +28,8 @@ SOURCES=fuser.c \
 	status.c \
 	timeout.c \
 	security.c \
-	access.c
+	access.c \
+	fuser.rc
 
 UMTYPE=windows
 
