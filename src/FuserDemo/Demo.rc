@@ -3,18 +3,10 @@
 
 
 
-// ---------------------------------------------------------------------
-//                 V E R S I O N
-//
-#define VER_FILEVERSION              0,00,00,0000
-#define VER_FILEVERSION_STR         "PRE RELEASE [C] 0,00,00,0000"
-
-// ---------------------------------------------------------------------
-
 #define VER_FILETYPE    			VFT_APP
 #define VER_FILESUBTYPE 			VFT2_UNKNOWN
-#define VER_TITEL                   "Mirror"
-#define VER_INTERNALNAME_STR        "mirror.exe"
+#define VER_TITEL                   "Demo"
+#define VER_INTERNALNAME_STR        "Demo.exe"
 
 //MAIN               ICON    DISCARDABLE     "TESTVER.ICO"
 

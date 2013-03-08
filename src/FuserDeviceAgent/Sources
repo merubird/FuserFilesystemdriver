@@ -1,17 +1,17 @@
-TARGETNAME=mounter
+TARGETNAME=FuserDeviceAgent
 TARGETTYPE=PROGRAM
 
 C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
 
 USE_MSVCRT=1
 
-INCLUDES=..\sys;..\fuser
+INCLUDES=..\FuserDriver;..\FuserUsermodeLib
 
 
-SOURCES=mount.c \
-		mounter.c \
-		heartbeat.c \
-		mount.rc
+SOURCES=FuserDeviceAgent.c \
+		Mount.c \
+		Heartbeat.c \
+		FuserDeviceAgent.rc
 
 UMTYPE=windows
 UMBASE=0x400000

@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+// TODO: Add service note, meaningful text
 
 
 #include <windows.h>
@@ -41,6 +42,7 @@ static LIST_ENTRY		g_MountList;
 
 BOOL g_DebugMode = TRUE;
 BOOL g_UseStdErr = FALSE;
+
 
 
 static DWORD WINAPI HandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext)
@@ -377,8 +379,9 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	InitializeCriticalSectionAndSpinCount(&g_CriticalSection, 0x80000400);
 #endif
 	InitializeListHead(&g_MountList);
-
-	g_StatusHandle = RegisterServiceCtrlHandlerEx(L"FuserMounter", HandlerEx, NULL); // TODO: Change name
+	
+	g_StatusHandle = RegisterServiceCtrlHandlerEx(FUSER_AGENT_SERVICE, HandlerEx, NULL); // TODO: Change name
+	
 
 	// extend completion time
 	g_ServiceStatus.dwServiceType				= SERVICE_WIN32_OWN_PROCESS;
@@ -392,14 +395,14 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 
 	BuildSecurityAttributes(&sa);
 
-	pipe = CreateNamedPipe(FUSER_CONTROL_PIPE,
+	pipe = CreateNamedPipe(FUSER_AGENT_CONTROL_PIPE,
 		PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, 
 		PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
 		1, sizeof(control), sizeof(control), 1000, &sa);
 
 	if (pipe == INVALID_HANDLE_VALUE) {
 		// TODO: should do something
-		DbgPrintW(L"FuserMounter: failed to create named pipe: %d\n", GetLastError());
+		DbgPrintW(L"DeviceAgent: failed to create named pipe: %d\n", GetLastError());
 	}
 
 	device = CreateFile(
@@ -414,7 +417,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	
 	if (device == INVALID_HANDLE_VALUE) {
 		// TODO: should do something
-		DbgPrintW(L"FuserMounter: failed to open device: %d\n", GetLastError());
+		DbgPrintW(L"DeviceAgent: failed to open device: %d\n", GetLastError());
 	}
 
 	eventConnect = CreateEvent(NULL, FALSE, FALSE, NULL);
@@ -438,7 +441,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 			&eventContext, sizeof(EVENT_CONTEXT), NULL, &driver)) {
 			DWORD error = GetLastError();
 			if (error != 997) {
-				DbgPrintW(L"FuserMounter: DeviceIoControl error: %d\n", error);
+				DbgPrintW(L"DeviceAgent: DeviceIoControl error: %d\n", error);
 			}
 		}
 
@@ -448,7 +451,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 
 		eventNo = WaitForMultipleObjects(3, eventArray, FALSE, INFINITE) - WAIT_OBJECT_0;
 
-		DbgPrintW(L"FuserMouner: get an event\n");
+		DbgPrintW(L"DeviceAgent: get an event\n");
 		if (eventNo == 0) {
 
 			DWORD result = 0;
@@ -464,7 +467,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 
 			if (GetOverlappedResult(device, &driver, &returnedBytes, FALSE)) {
 				if (returnedBytes == sizeof(EVENT_CONTEXT)) {
-					DbgPrintW(L"FuserMounter: Unmount\n");
+					DbgPrintW(L"DeviceAgent: Unmount\n");
 
 					ZeroMemory(&unmount, sizeof(FUSER_CONTROL));
 					unmount.Type = FUSER_CONTROL_UNMOUNT;
@@ -472,14 +475,14 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 							eventContext.Unmount.DeviceName);
 					FuserControl(&unmount);
 				} else {
-					DbgPrintW(L"FuserMounter: Unmount error\n", control.Type);
+					DbgPrintW(L"DeviceAgent: Unmount error\n", control.Type);
 				}
 			}
 
 		} else if (eventNo == 2) {		
 			UnmountAll(); // Removes all mounts before terminating
 		
-			DbgPrintW(L"FuserMounter: stop mounter service\n");
+			DbgPrintW(L"DeviceAgent: stop Agent service\n");
 			g_ServiceStatus.dwWaitHint     = 0;
 			g_ServiceStatus.dwCheckPoint   = 0;
 			g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;			
@@ -508,7 +511,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hinstPrev, LPSTR lpszCmdLine, int nCmdShow)
 {
 	SERVICE_TABLE_ENTRY serviceTable[] = {
-		{L"FuserMounter", ServiceMain}, {NULL, NULL}
+		{L"DeviceAgent", ServiceMain}, {NULL, NULL}
 	};
 
 	StartServiceCtrlDispatcher(serviceTable);

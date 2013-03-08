@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+// TODO: Check whether this exe is needed at all, possibly consolidate with agent.
 
 #include <windows.h>
 #include <stdio.h>
@@ -105,12 +106,13 @@ int Unmount(LPCWSTR	MountPoint, BOOL ForceUnmount)
 int ShowUsage()
 {
 	// TODO: Adjust filename
+	// TODO: Completely revise
 	fprintf(stderr,
-		"fuserctrl /u MountPoint (/f)\n" \
-		"fuserntl /m\n" \
-		"fuserctl /i [d|s|a]\n" \
-		"fuserctl /r [d|s|a]\n" \
-		"fuserctl /v\n" \
+		"fuser /u MountPoint (/f)\n" \
+		"fuser /m\n" \
+		"fuser /i [d|s|a]\n" \
+		"fuser /r [d|s|a]\n" \
+		"fuser /v\n" \
 		"\n" \
 		"Example:\n" \
 		"  /u M:               : Unmount M: drive\n" \
@@ -118,9 +120,9 @@ int ShowUsage()
 		"  /u 1                : Unmount mount point 1\n" \
 		"  /u M: /f            : Force unmount M: drive\n" \
 		"  /m                  : Print mount points list\n" \
-		"  /i s                : Install mounter service\n" \
+		"  /i s                : Install DeviceAgent\n" \
 		"  /r d                : Remove driver\n" \
-		"  /r a                : Remove driver and mounter service\n" \
+		"  /r a                : Remove driver and DeviceAgent\n" \
 		"  /v                  : Print Fuser version\n");
 	return -1;
 }
@@ -133,7 +135,7 @@ wmain(int argc, PWCHAR argv[])
 	ULONG	i;
 	WCHAR	fileName[MAX_PATH];
 	WCHAR	driverFullPath[MAX_PATH];
-	WCHAR	mounterFullPath[MAX_PATH];
+	WCHAR	deviceAgentFullPath[MAX_PATH];
 	WCHAR	type;
 
 	//setlocale(LC_ALL, "");
@@ -145,21 +147,20 @@ wmain(int argc, PWCHAR argv[])
 		;
 	fileName[i] = L'\0';
 
-	ZeroMemory(mounterFullPath, sizeof(mounterFullPath));
+	ZeroMemory(deviceAgentFullPath, sizeof(deviceAgentFullPath)); 
 	ZeroMemory(driverFullPath, sizeof(driverFullPath));
-	wcscpy_s(mounterFullPath, MAX_PATH, fileName);
-	mounterFullPath[i] = L'\\';
-	wcscat_s(mounterFullPath, MAX_PATH, L"mounter.exe");  // TODO: When change the filename, change this too.
+	wcscpy_s(deviceAgentFullPath, MAX_PATH, fileName);  
+	deviceAgentFullPath[i] = L'\\';
+	wcscat_s(deviceAgentFullPath, MAX_PATH, L"FuserDeviceAgent.exe");  
 
 	GetSystemDirectory(driverFullPath, MAX_PATH);
 	wcscat_s(driverFullPath, MAX_PATH, L"\\drivers\\fuser.sys"); // TODO: When change the filename, change this too.
 
 	fwprintf(stderr, L"driver path %s\n", driverFullPath);
-	fwprintf(stderr, L"mounter path %s\n", mounterFullPath);
+	fwprintf(stderr, L"Fuser DeviceAgent Path %s\n", deviceAgentFullPath);
 
 
-	if (GetOption(argc, argv, 1) == L'v') {
-		fprintf(stderr, "fuserctl : %s %s\n", __DATE__, __TIME__);
+	if (GetOption(argc, argv, 1) == L'v') {		
 		fprintf(stderr, "Fuser version : %d\n", FuserVersion());		
 		fprintf(stderr, "Fuser driver version : 0x%X\n", FuserDriverVersion());		
 		return 0;
@@ -189,12 +190,12 @@ wmain(int argc, PWCHAR argv[])
 				fprintf(stderr, "driver install failed\n");
 
 		} else if (type == L's') {
-			if (FuserServiceInstall(FUSER_MOUNTER_SERVICE,
+			if (FuserServiceInstall(FUSER_AGENT_SERVICE,
 									SERVICE_WIN32_OWN_PROCESS,
-									mounterFullPath))
-				fprintf(stderr, "mounter install ok\n");
+									deviceAgentFullPath))
+				fprintf(stderr, "DeviceAgent install ok\n");
 			else
-				fprintf(stderr, "mounter install failed\n");
+				fprintf(stderr, "DeviceAgent install failed\n");
 		
 		} else if (type == L'a') {
 			if (FuserServiceInstall(FUSER_DRIVER_SERVICE,
@@ -204,12 +205,12 @@ wmain(int argc, PWCHAR argv[])
 			else
 				fprintf(stderr, "driver install failed\n");
 
-			if (FuserServiceInstall(FUSER_MOUNTER_SERVICE,
+			if (FuserServiceInstall(FUSER_AGENT_SERVICE,
 									SERVICE_WIN32_OWN_PROCESS,
-									mounterFullPath))
-				fprintf(stderr, "mounter install ok\n");
+									deviceAgentFullPath))
+				fprintf(stderr, "DeviceAgent install ok\n");
 			else
-				fprintf(stderr, "mounter install failed\n");
+				fprintf(stderr, "DeviceAgent install failed\n");
 		} else if (type == L'n') {
 			if (FuserNetworkProviderInstall())
 				fprintf(stderr, "network provider install ok\n");
@@ -226,16 +227,16 @@ wmain(int argc, PWCHAR argv[])
 				fprintf(stderr, "driver remvoe failed\n");
 		
 		} else if (type == L's') {
-			if (FuserServiceDelete(FUSER_MOUNTER_SERVICE))
-				fprintf(stderr, "mounter remove ok\n");
+			if (FuserServiceDelete(FUSER_AGENT_SERVICE))
+				fprintf(stderr, "DeviceAgent remove ok\n");
 			else
-				fprintf(stderr, "mounter remvoe failed\n");	
+				fprintf(stderr, "DeviceAgent remvoe failed\n");	
 		
 		} else if (type == L'a') {
-			if (FuserServiceDelete(FUSER_MOUNTER_SERVICE))
-				fprintf(stderr, "mounter remove ok\n");
+			if (FuserServiceDelete(FUSER_AGENT_SERVICE))
+				fprintf(stderr, "DeviceAgent remove ok\n");
 			else
-				fprintf(stderr, "mounter remvoe failed\n");	
+				fprintf(stderr, "DeviceAgent remvoe failed\n");
 
 			if (FuserServiceDelete(FUSER_DRIVER_SERVICE))
 				fprintf(stderr, "driver remove ok\n");

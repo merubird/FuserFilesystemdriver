@@ -36,25 +36,26 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 extern ULONG g_Debug; // TODO: find out where is used
 
-// TODO: change Devicename: FuserDev
-#define FUSER_DEFAULT_VOLUME_LABEL			L"FUSER"
+#define FUSER_DEFAULT_VOLUME_LABEL			L"Fuser Filesystem Driver"
 #define FUSER_DEFAULT_SERIALNUMBER			0x19831116;
 
 #define FUSER_MDL_ALLOCATED					0x1 // TODO: change name
 
 
-#define FUSER_GLOBAL_DEVICE_NAME			L"\\Device\\Fuser"
-#define FUSER_GLOBAL_SYMBOLIC_LINK_NAME		L"\\DosDevices\\Global\\Fuser"
+// global device unique for systemdriver
+#define FUSER_GLOBAL_DEVICE_NAME			L"\\Device\\FuserSystem"
+#define FUSER_GLOBAL_SYMBOLIC_LINK_NAME		L"\\DosDevices\\Global\\FuserSystem" // access: \\.\FuserSystem
 
-#define FUSER_FS_DEVICE_NAME				L"\\Device\\Fuser"
-#define FUSER_DISK_DEVICE_NAME				L"\\Device\\Volume"               // DeviceName is \Volume{D6CC17C5-1734-4085-BCE7-964F1E9F5DE9} TODO: check GUID
-#define FUSER_SYMBOLIC_LINK_NAME    		L"\\DosDevices\\Global\\Volume"   // SymbolicName is \\DosDevices\\Global\\Volume{D6CC17C5-1734-4085-BCE7-964F1E9F5DE9}	TODO: check GUID
+#define FUSER_FS_DEVICE_NAME				L"\\Device\\FuserFS"                   // FS Device :   \Device\Fuser{b9892757-6a70-4e51-9eaf-9ef1e093b0e8}   TODO: check if still used
+#define FUSER_DISK_DEVICE_NAME				L"\\Device\\FuserDevice"               // DeviceName:   \Device\Volume{b9892757-6a70-4e51-9eaf-9ef1e093b0e8}  TODO: check if still used
+#define FUSER_SYMBOLIC_LINK_NAME    		L"\\DosDevices\\Global\\FuserDevice"   // SymbolicName: \DosDevices\Global\Volume{b9892757-6a70-4e51-9eaf-9ef1e093b0e8}  TODO: check if still used
 
 #define FUSER_NET_DEVICE_NAME		  	    L"\\Device\\FuserRedirector"   // TODO remove networkprovider
 #define FUSER_NET_SYMBOLIC_LINK_NAME        L"\\DosDevices\\Global\\FuserRedirector"   // TODO remove networkprovider
+							
+#define FUSER_BASE_GUID						{0xb9892757, 0x6a70, 0x4e51, {0x9e, 0xaf, 0x9e, 0xf1, 0xe0, 0x93, 0xb0, 0xe8}} // {b9892757-6a70-4e51-9eaf-9ef1e093b0e8}
 
-								// {D6CC17C5-1734-4085-BCE7-964F1E9F5DE9}
-#define FUSER_BASE_GUID			{0xd6cc17c5, 0x1734, 0x4085, {0xbc, 0xe7, 0x96, 0x4f, 0x1e, 0x9f, 0x5d, 0xe9}} // TODO change value
+	
 
 
 #define DRIVER_CONTEXT_EVENT		2
@@ -97,11 +98,11 @@ extern UNICODE_STRING	FcbFileNameNull;
 
 
 //Redefine ExAllocatePool
-#define TAG (ULONG)'AKOD' // TODO: find out where everything is used, change value.
+#define TAG (ULONG)'esuF'
 #ifdef ExAllocatePool
 	#undef ExAllocatePool
 #endif
-#define ExAllocatePool(size)	ExAllocatePoolWithTag(NonPagedPool, size, TAG)
+#define ExAllocatePool(size)	ExAllocatePoolWithTag(NonPagedPool, size, TAG) // TODO: Windows8 change type to NonPagedPoolNx
 
 
 extern NPAGED_LOOKASIDE_LIST	FuserIrpEntryLookasideList;

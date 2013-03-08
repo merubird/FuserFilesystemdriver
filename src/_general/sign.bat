@@ -1,10 +1,10 @@
 @echo off
 
-IF EXIST %1\fuser.sys     _sign-internal.bat %1\fuser.sys     drv %2
-IF EXIST %1\fuser.dll     _sign-internal.bat %1\fuser.dll     app %2
-IF EXIST %1\fuserctl.exe  _sign-internal.bat %1\fuserctl.exe  app %2
-IF EXIST %1\mirror.exe    _sign-internal.bat %1\mirror.exe    app %2
-IF EXIST %1\mounter.exe   _sign-internal.bat %1\mounter.exe   app %2
+IF EXIST %1\Fuser.sys              _sign-internal.bat %1\Fuser.sys              drv %2
+IF EXIST %1\Fuser.dll              _sign-internal.bat %1\Fuser.dll              app %2
+IF EXIST %1\Fuser.exe              _sign-internal.bat %1\Fuser.exe              app %2
+IF EXIST %1\Demo.exe               _sign-internal.bat %1\Demo.exe               app %2
+IF EXIST %1\FuserDeviceAgent.exe   _sign-internal.bat %1\FuserDeviceAgent.exe   app %2
 
 echo.
 echo.

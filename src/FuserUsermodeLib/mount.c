@@ -142,23 +142,23 @@ FuserMountControl(PFUSER_CONTROL Control)
 	DWORD pipeMode;
 	DWORD error;
 	for (;;) {
-		pipe = CreateFile(FUSER_CONTROL_PIPE,  GENERIC_READ|GENERIC_WRITE,
+		pipe = CreateFile(FUSER_AGENT_CONTROL_PIPE,  GENERIC_READ|GENERIC_WRITE,
 						0, NULL, OPEN_EXISTING, 0, NULL);
 		if (pipe != INVALID_HANDLE_VALUE) {
 			break;
 		}
 		error = GetLastError();
 		if (error == ERROR_PIPE_BUSY) {
-			if (!WaitNamedPipe(FUSER_CONTROL_PIPE, NMPWAIT_USE_DEFAULT_WAIT)) {
-				DbgPrint("FuserMounter service : ERROR_PIPE_BUSY\n");
+			if (!WaitNamedPipe(FUSER_AGENT_CONTROL_PIPE, NMPWAIT_USE_DEFAULT_WAIT)) {
+				DbgPrint("FuserDeviceAgent : ERROR_PIPE_BUSY\n");
 				return FALSE;
 			}
 			continue;
 		} else if (error == ERROR_ACCESS_DENIED) {
-			DbgPrint("failed to connect FuserMounter service: access denied\n");
+			DbgPrint("failed to connect FuserDeviceAgent service: access denied\n");
 			return FALSE;
 		} else {
-			DbgPrint("failed to connect FuserMounter service: %d\n", GetLastError());
+			DbgPrint("failed to connect FuserDeviceAgent service: %d\n", GetLastError());
 			return FALSE;
 		}
 	}

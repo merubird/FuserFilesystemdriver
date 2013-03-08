@@ -1,4 +1,4 @@
-TARGETNAME=fuserctl
+TARGETNAME=Fuser
 TARGETTYPE=PROGRAM
 
 UMENTRY=wmain
@@ -6,12 +6,12 @@ USE_MSVCRT=1
 
 C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
 
-INCLUDES=..\fuser
+INCLUDES=..\FuserUsermodeLib
 
-LINKLIBS=..\fuser\$(O)\fuser.lib
+LINKLIBS=..\FuserUsermodeLib\$(O)\fuser.lib
 
-SOURCES=fuserctl.c \
-		fuserctl.rc
+SOURCES=fuser.c \
+		fuser.rc
 
 UMTYPE=console
 UMBASE=0x400000

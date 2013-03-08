@@ -1,4 +1,4 @@
-TARGETNAME=fuser
+TARGETNAME=Fuser
 TARGETTYPE=DYNLINK
 
 C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
@@ -9,7 +9,7 @@ TARGETLIBS=$(SDK_LIB_PATH)\kernel32.lib \
 
 USE_MSVCRT=1
 
-INCLUDES=..\sys\
+INCLUDES=..\FuserDriver\
 
 SOURCES=fuser.c \
 	write.c \

@@ -30,11 +30,11 @@ extern "C" {
 #define FUSER_MOUNT_POINT_SUPPORTED_VERSION 600 // TODO: Remove this
 #define FUSER_SECURITY_SUPPORTED_VERSION	600 // TODO: Remove this
 
-#define FUSER_DRIVER_SERVICE L"Fuser"			// TODO: used by fuserctrl
-#define FUSER_MOUNTER_SERVICE L"FuserMounter"   // TODO: used by fuserctrl
+#define FUSER_DRIVER_SERVICE			L"FuserDeviceDriver"
+#define FUSER_AGENT_SERVICE				L"FuserDeviceAgent"
 
-#define FUSER_GLOBAL_DEVICE_NAME	L"\\\\.\\Fuser" // TODO: adapt at the opportunity
-#define FUSER_CONTROL_PIPE			L"\\\\.\\pipe\\FuserMounter"
+#define FUSER_GLOBAL_DEVICE_NAME    	L"\\\\.\\FuserSystem" //local ressource refere to FUSER_GLOBAL_SYMBOLIC_LINK_NAME
+#define FUSER_AGENT_CONTROL_PIPE		L"\\\\.\\pipe\\FuserDeviceAgentCommand" //communication with FuserDeviceAgent
 
 
 #define FUSER_MAX_THREAD		15
@@ -48,10 +48,10 @@ extern "C" {
 
 
 #define FUSER_CONTROL_FAIL		0
-#define FUSER_CONTROL_SUCCESS	1 // used by mounter
-#define FUSER_CONTROL_CHECK		3 // TODO: check what this is supposed to do and possibly remove it, used by mounter
-#define FUSER_CONTROL_FIND		4 // TODO: check what this is supposed to do and possibly remove it, used by mounter
-#define FUSER_CONTROL_LIST		5 // used by mounter
+#define FUSER_CONTROL_SUCCESS	1 // used by DeviceAgent
+#define FUSER_CONTROL_CHECK		3 // TODO: check what this is supposed to do and possibly remove it, used by DeviceAgent
+#define FUSER_CONTROL_FIND		4 // TODO: check what this is supposed to do and possibly remove it, used by DeviceAgent
+#define FUSER_CONTROL_LIST		5 // used by DeviceAgent
 
 
 

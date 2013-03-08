@@ -3,14 +3,6 @@
 
 
 
-// ---------------------------------------------------------------------
-//                 V E R S I O N
-//
-#define VER_FILEVERSION              0,00,00,0000
-#define VER_FILEVERSION_STR         "PRE RELEASE [C] 0,00,00,0000"
-
-// ---------------------------------------------------------------------
-
 #define VER_FILETYPE    			VFT_DLL
 #define VER_FILESUBTYPE 			VFT2_UNKNOWN
 #define VER_TITEL                   "Usermode Library"

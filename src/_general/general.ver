@@ -21,10 +21,28 @@ VFT2_DRV_SOUND	File contains a sound driver.
 VFT2_DRV_VERSIONED_PRINTER	File contains a versioned printer driver.
 */
 
+
+
 #include "_build.ver"
+// ---------------------------------------------------------------------
+//                 V E R S I O N
+//
+#define VER_FILEVERSION              0,00,00,0000
+#define VER_FILEVERSION_STR         "PRE RELEASE [D] 0,00,00,0000"
+
+// ---------------------------------------------------------------------
 
 
+// ---------------------------------------------------------------------
+//                 T I T E L
+//
 #define VER_FILEDESCRIPTION_STR     VER_BUILDDEBUG "Fuser Filesystem Driver - " VER_TITEL " " VER_ARCH
+#define VER_LEGALCOPYRIGHT_STR     "Copyright (C) " VER_YEAR " Christian Auer"
+
+// ---------------------------------------------------------------------
+
+
+
 
 #define VER_ORIGINALFILENAME_STR    VER_INTERNALNAME_STR
 
@@ -34,7 +52,7 @@ VFT2_DRV_VERSIONED_PRINTER	File contains a versioned printer driver.
 #undef  VER_PRODUCTVERSION_STR
 #define VER_PRODUCTVERSION_STR VER_FILEVERSION_STR
 
-#define VER_LEGALCOPYRIGHT_STR "Copyright (C) " VER_YEAR " Christian Auer"
+
 #ifdef VER_COMPANYNAME_STR
     #undef VER_COMPANYNAME_STR
     #define VER_COMPANYNAME_STR "Christian Auer"

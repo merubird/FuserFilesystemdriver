@@ -113,10 +113,6 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 
-// TODO: replace definitions
-
-
-
 #define FILE_SUPERSEDE                  0x00000000
 #define FILE_OPEN                       0x00000001
 #define FILE_CREATE                     0x00000002

@@ -477,10 +477,8 @@ FuserEventStart(
 		FDbgPrint("  DeviceCharacteristics |= FILE_REMOVABLE_MEDIA\n");
 		deviceCharacteristics |= FILE_REMOVABLE_MEDIA;
 	}
-
-
-	baseGuid.Data2 = (USHORT)(fuserGlobal->MountId & 0xFFFF) ^ baseGuid.Data2;
-	baseGuid.Data3 = (USHORT)(fuserGlobal->MountId >> 16) ^ baseGuid.Data3;
+	
+	baseGuid.Data1 ^= fuserGlobal->MountId;
 
 	status = RtlStringFromGUID(&baseGuid, &unicodeGuid);
 	if (!NT_SUCCESS(status)) {
@@ -490,7 +488,8 @@ FuserEventStart(
 	RtlStringCchCopyW(baseGuidString, sizeof(baseGuidString) / sizeof(WCHAR), unicodeGuid.Buffer);
 	RtlFreeUnicodeString(&unicodeGuid);
 
-	InterlockedIncrement(&fuserGlobal->MountId);
+	InterlockedIncrement(&fuserGlobal->MountId); // TODO: Only limited number of mounts possible, this problem should be solved.
+	
 
 	KeEnterCriticalRegion();
 	ExAcquireResourceExclusiveLite(&fuserGlobal->Resource, TRUE);
@@ -516,9 +515,9 @@ FuserEventStart(
 	driverInfo->Status = FUSER_MOUNTED;
 	driverInfo->DriverVersion = FUSER_DRIVER_VERSION;
 
-	// SymbolicName is \\DosDevices\\Global\\Volume{D6CC17C5-1734-4085-BCE7-964F1E9F5DE9}
+	// SymbolicName is \\DosDevices\\Global\\FuserDevice{b9892757-6a70-4e51-9eaf-9ef1e093b0e8}
 	// Finds the last '\' and copy into DeviceName.
-	// DeviceName is \Volume{D6CC17C5-1734-4085-BCE7-964F1E9F5DE9}
+	// DeviceName is \FuserDevice{b9892757-6a70-4e51-9eaf-9ef1e093b0e8}
 	deviceNamePos = dcb->SymbolicLinkName->Length / sizeof(WCHAR) - 1;
 	for (; dcb->SymbolicLinkName->Buffer[deviceNamePos] != L'\\'; --deviceNamePos)
 		;

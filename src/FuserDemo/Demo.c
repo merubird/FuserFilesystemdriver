@@ -1058,7 +1058,7 @@ wmain(ULONG argc, PWCHAR argv[])
 
 	if (argc < 5) {
 		// TODO: Change path/name
-		fprintf(stderr, "mirror.exe\n"
+		fprintf(stderr, "Demo.exe\n"
 			"  /r RootDirectory (ex. /r c:\\test)\n"
 			"  /l DriveLetter (ex. /l m)\n"
 			"  /t ThreadCount (ex. /t 5)\n"

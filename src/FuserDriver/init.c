@@ -58,13 +58,14 @@ FuserCreateGlobalDiskDevice(
 	FDbgPrint("FuserGlobalDevice: %wZ created\n", &deviceName);
 	ObReferenceObject(deviceObject);
 
-	
+
 	status = IoCreateSymbolicLink(&symbolicLinkName, &deviceName);
 	if (!NT_SUCCESS(status)) {
 		FDbgPrint("  IoCreateSymbolicLink returned 0x%x\n", status);
 		IoDeleteDevice(deviceObject);
 		return status;
 	}
+	
 	FDbgPrint("SymbolicLink: %wZ -> %wZ created\n", &deviceName, &symbolicLinkName);
 	fuserGlobal = deviceObject->DeviceExtension;
 	fuserGlobal->DeviceObject = deviceObject;

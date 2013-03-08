@@ -3,18 +3,10 @@
 
 
 
-// ---------------------------------------------------------------------
-//                 V E R S I O N
-//
-#define VER_FILEVERSION              0,00,00,0000
-#define VER_FILEVERSION_STR         "PRE RELEASE [C] 0,00,00,0000"
-
-// ---------------------------------------------------------------------
-
 #define VER_FILETYPE    			VFT_APP
 #define VER_FILESUBTYPE 			VFT2_UNKNOWN
-#define VER_TITEL                   "Mounter Service"
-#define VER_INTERNALNAME_STR        "mounter.exe"
+#define VER_TITEL                   "Device Agent"
+#define VER_INTERNALNAME_STR        "FuserDeviceAgent.exe"
 
 //MAIN               ICON    DISCARDABLE     "TESTVER.ICO"
 

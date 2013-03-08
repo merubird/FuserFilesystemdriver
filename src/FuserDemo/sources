@@ -1,4 +1,4 @@
-TARGETNAME=mirror
+TARGETNAME=Demo
 TARGETTYPE=PROGRAM
 
 UMENTRY=wmain
@@ -6,12 +6,12 @@ USE_MSVCRT=1
 
 C_DEFINES=$(C_DEFINES) -DUNICODE -D_UNICODE
 
-INCLUDES=..\fuser
+INCLUDES=..\FuserUsermodeLib
 
-LINKLIBS=..\fuser\$(O)\fuser.lib $(SDK_LIB_PATH)\user32.lib 
+LINKLIBS=..\FuserUsermodeLib\$(O)\fuser.lib $(SDK_LIB_PATH)\user32.lib 
 
-SOURCES=mirror.c \
-		mirror.rc
+SOURCES=Demo.c \
+		Demo.rc
 		
 
 UMTYPE=console

@@ -17,7 +17,7 @@
 ;--------------------------------
 ; Version Information
 
-	!define VERSION "pre0.0.C"
+	!define VERSION "pre0.0.D"
 	;VIProductVersion "${VERSION}"
 	VIProductVersion "1.2.3.4"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "FuserFilesystem Driver Setup"
@@ -57,11 +57,11 @@
 
 !macro driverinstaller opt
 	${If} ${RunningX64}
-		ExecWait '"$PROGRAMFILES64\FuserFilesystemDriver\fuserctl.exe" ${opt}' $0
+		ExecWait '"$PROGRAMFILES64\FuserFilesystemDriver\Fuser.exe" ${opt}' $0
 	${Else}
-		ExecWait '"$PROGRAMFILES\FuserFilesystemDriver\fuserctl.exe" ${opt}' $0
+		ExecWait '"$PROGRAMFILES\FuserFilesystemDriver\Fuser.exe" ${opt}' $0
 	${EndIf}	
-	DetailPrint "fuserctl returned $0"
+	DetailPrint "Fuser returned $0"
 !macroend
 
 
@@ -69,13 +69,13 @@
 
   SetOutPath $PROGRAMFILES\FuserFilesystemDriver
   
-    File ..\bin\${os}_x86\fuserctl.exe
-    File ..\bin\${os}_x86\mounter.exe
-    File ..\bin\${os}_x86\mirror.exe
+    File ..\bin\${os}_x86\Fuser.exe
+    File ..\bin\${os}_x86\FuserDeviceAgent.exe
+    File ..\bin\${os}_x86\Demo.exe
 
   SetOutPath $SYSDIR
 
-    File ..\bin\${os}_x86\fuser.dll
+    File ..\bin\${os}_x86\Fuser.dll
 
 !macroend
 
@@ -84,21 +84,21 @@
 
   SetOutPath $PROGRAMFILES64\FuserFilesystemDriver
   
-	File ..\bin\${os}_amd64\fuserctl.exe
-    File ..\bin\${os}_amd64\mounter.exe
-    File ..\bin\${os}_amd64\mirror.exe	
+	File ..\bin\${os}_amd64\Fuser.exe
+    File ..\bin\${os}_amd64\FuserDeviceAgent.exe
+    File ..\bin\${os}_amd64\Demo.exe	
 
   ${DisableX64FSRedirection}
 
   SetOutPath $SYSDIR
-	/*  Installing 64bit Usermode Treiber */
-    File ..\bin\${os}_amd64\fuser.dll
+	/*  Installing 64bit Usermode Library */
+    File ..\bin\${os}_amd64\Fuser.dll
 
   ${EnableX64FSRedirection}
   
   SetOutPath $SYSDIR
-	/*  Installing 32bit Usermode Treiber */
-    File ..\bin\${os}_x86\fuser.dll
+	/*  Installing 32bit Usermode Library */
+    File ..\bin\${os}_x86\Fuser.dll
 
 !macroend
 
@@ -106,7 +106,7 @@
 
 !macro X86Driver os
   SetOutPath $SYSDIR\drivers
-    File ..\bin\${os}_x86\fuser.sys
+    File ..\bin\${os}_x86\Fuser.sys
 !macroend
 
 !macro X64Driver os
@@ -114,7 +114,7 @@
 
   SetOutPath $SYSDIR\drivers
 
-    File ..\bin\${os}_amd64\fuser.sys
+    File ..\bin\${os}_amd64\Fuser.sys
 
   ${EnableX64FSRedirection}
 !macroend
@@ -218,17 +218,17 @@ Section "Uninstall"
   
   ${If} ${RunningX64}
 	RMDir /r $PROGRAMFILES64\FuserFilesystemDriver  
-	Delete $SYSDIR\fuser.dll
+	Delete $SYSDIR\Fuser.dll
   
     ${DisableX64FSRedirection}
-      Delete $SYSDIR\drivers\fuser.sys
-	  Delete $SYSDIR\fuser.dll
+      Delete $SYSDIR\drivers\Fuser.sys
+	  Delete $SYSDIR\Fuser.dll
     ${EnableX64FSRedirection}
   ${Else}
 	RMDir /r $PROGRAMFILES\FuserFilesystemDriver  
-	Delete $SYSDIR\fuser.dll
+	Delete $SYSDIR\Fuser.dll
   
-    Delete $SYSDIR\drivers\fuser.sys
+    Delete $SYSDIR\drivers\Fuser.sys
   ${EndIf}
 
   ; Remove registry keys

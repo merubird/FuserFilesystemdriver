@@ -2,19 +2,10 @@
 #include <ntverp.h>
 
 
-
-// ---------------------------------------------------------------------
-//                 V E R S I O N
-//
-#define VER_FILEVERSION              0,00,00,0000
-#define VER_FILEVERSION_STR         "PRE RELEASE [C] 0,00,00,0000"
-
-// ---------------------------------------------------------------------
-
 #define VER_FILETYPE    			VFT_DRV
 #define VER_FILESUBTYPE 			VFT2_DRV_SYSTEM
-#define VER_TITEL                   "Kernelmode Driver"
-#define VER_INTERNALNAME_STR        "fuser.sys"
+#define VER_TITEL                   "Systemdriver"
+#define VER_INTERNALNAME_STR        "Fuser.sys"
 
 
 
