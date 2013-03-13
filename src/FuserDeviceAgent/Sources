@@ -7,10 +7,14 @@ USE_MSVCRT=1
 
 INCLUDES=..\FuserDriver;..\FuserUsermodeLib
 
+LINKLIBS=..\FuserUsermodeLib\$(O)\fuser.lib \
+		  $(SDK_LIB_PATH)\Shell32.lib
+		  
 
 SOURCES=FuserDeviceAgent.c \
 		Mount.c \
 		Heartbeat.c \
+		Service.c \
 		FuserDeviceAgent.rc
 
 UMTYPE=windows

@@ -35,6 +35,24 @@ extern "C" {
 #endif
 
 
+
+
+// ---------------------------------------------------------------------
+//                 S E R V I C E
+//
+
+#define SERVICEDESCRIPTION              L"Controls and manage the virtual fuser devices."
+#define SERVICE_NAME_DRIVER             L"FuserDeviceDriver"
+#define SERVICE_NAME_AGENT              L"FuserDeviceAgent"
+
+// ---------------------------------------------------------------------
+
+
+
+
+
+
+
 typedef struct _MOUNT_ENTRY {
 	LIST_ENTRY		ListEntry;
 	FUSER_CONTROL	MountControl;
@@ -48,34 +66,21 @@ typedef struct _MOUNT_ENTRY {
 	
 } MOUNT_ENTRY, *PMOUNT_ENTRY;
 
+BOOL FuserControlMount(LPCWSTR MountPoint, LPCWSTR DeivceName);
 
+BOOL FuserControlUnmount(LPCWSTR MountPoint);
 
-BOOL
-FuserControlMount(
-	LPCWSTR	MountPoint,
-	LPCWSTR	DeivceName);
+VOID HeartbeatStart(PMOUNT_ENTRY mount);
 
+VOID HeartbeatStop(PMOUNT_ENTRY mount);
 
-BOOL
-FuserControlUnmount(
-	LPCWSTR MountPoint);	
+VOID HeartbeatSetAliveSignal(PMOUNT_ENTRY mount);
 
-VOID
-HeartbeatStart(PMOUNT_ENTRY mount);
+VOID SendReleaseIRP(LPCWSTR DeviceName);
 
-VOID
-HeartbeatStop(PMOUNT_ENTRY mount);
+VOID RemoveMountEntry(PMOUNT_ENTRY MountEntry);
 
-VOID
-HeartbeatSetAliveSignal(PMOUNT_ENTRY mount);
-
-VOID
-SendReleaseIRP(
-	LPCWSTR	DeviceName);
-
-VOID
-RemoveMountEntry(PMOUNT_ENTRY MountEntry);
-
+VOID StartServiceMode();
 
 #ifdef __cplusplus
 }

@@ -27,8 +27,10 @@ THE SOFTWARE.
 #include <winioctl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "mount.h"
+#include "FuserDeviceAgent.h"
 
+// TODO: revise
+// TODO: Allow mounts with all drive letters (A:\)
 
 
 typedef struct _REPARSE_DATA_BUFFER {
@@ -63,8 +65,8 @@ typedef struct _REPARSE_DATA_BUFFER {
 
 BOOL
 CreateDriveLetter(
-	WCHAR		DriveLetter,
-	LPCWSTR	DeviceName)
+	WCHAR    DriveLetter,
+	LPCWSTR  DeviceName)
 {
 	WCHAR   dosDevice[] = L"\\\\.\\C:";
 	WCHAR   driveName[] = L"C:";

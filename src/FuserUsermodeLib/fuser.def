@@ -9,8 +9,6 @@ FuserRemoveMountPoint
 FuserMountControl
 FuserVersion
 FuserDriverVersion
-FuserServiceInstall
-FuserServiceDelete
 FuserOpenRequestorToken
 FuserNetworkProviderInstall
 FuserNetworkProviderUninstall

@@ -17,7 +17,7 @@
 ;--------------------------------
 ; Version Information
 
-	!define VERSION "pre0.0.D"
+	!define VERSION "pre0.0.E"
 	;VIProductVersion "${VERSION}"
 	VIProductVersion "1.2.3.4"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "FuserFilesystem Driver Setup"
@@ -26,6 +26,7 @@
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" "Copyright Christian Auer"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "FileDescription" "FuserFilesystem Driver Setup"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${VERSION}"
+	VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductVersion" "${VERSION}"
 	
 ;--------------------------------
 
@@ -57,19 +58,21 @@
 
 !macro driverinstaller opt
 	${If} ${RunningX64}
-		ExecWait '"$PROGRAMFILES64\FuserFilesystemDriver\Fuser.exe" ${opt}' $0
+		ExecWait '"$PROGRAMFILES64\FuserFilesystemDriver\FuserDeviceAgent.exe" ${opt}' $0
 	${Else}
-		ExecWait '"$PROGRAMFILES\FuserFilesystemDriver\Fuser.exe" ${opt}' $0
+		ExecWait '"$PROGRAMFILES\FuserFilesystemDriver\FuserDeviceAgent.exe" ${opt}' $0
 	${EndIf}	
-	DetailPrint "Fuser returned $0"
+	
+	${If} $0 != 0
+	  MessageBox MB_ICONSTOP "An error occured during the driver instalation! Please reboot and try again. Errorcode: $0"	
+	${EndIf}	
 !macroend
 
 
 !macro X86Files os
 
   SetOutPath $PROGRAMFILES\FuserFilesystemDriver
-  
-    File ..\bin\${os}_x86\Fuser.exe
+      
     File ..\bin\${os}_x86\FuserDeviceAgent.exe
     File ..\bin\${os}_x86\Demo.exe
 
@@ -83,8 +86,7 @@
 !macro X64Files os
 
   SetOutPath $PROGRAMFILES64\FuserFilesystemDriver
-  
-	File ..\bin\${os}_amd64\Fuser.exe
+  	
     File ..\bin\${os}_amd64\FuserDeviceAgent.exe
     File ..\bin\${os}_amd64\Demo.exe	
 
@@ -123,14 +125,17 @@
 
 
 !macro FuserSetup
-	!insertmacro driverinstaller "/i a"
+	!insertmacro driverinstaller "/i"
 
 	${If} ${RunningX64}
 		WriteUninstaller $PROGRAMFILES64\FuserFilesystemDriver\FuserUninstall.exe
 		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "UninstallString" '"$PROGRAMFILES64\FuserFilesystemDriver\FuserUninstall.exe"'
+		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "DisplayIcon" "$PROGRAMFILES64\FuserFilesystemDriver\FuserDeviceAgent.exe"
+		
 	${Else}
 		WriteUninstaller $PROGRAMFILES\FuserFilesystemDriver\FuserUninstall.exe
 		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "UninstallString" '"$PROGRAMFILES\FuserFilesystemDriver\FuserUninstall.exe"'
+		WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "DisplayIcon" "$PROGRAMFILES\FuserFilesystemDriver\FuserDeviceAgent.exe"
 	${EndIf}
    
 
@@ -138,6 +143,8 @@
 	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "DisplayName" "Fuser Filesystem Driver ${VERSION}"  
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "NoModify" 1
 	WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "NoRepair" 1
+	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "DisplayVersion" "${VERSION}"
+	WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FuserFilesystemDriver" "Publisher" "Christian Auer"		
 !macroend
 
 
@@ -214,7 +221,7 @@ SectionEnd
 
 
 Section "Uninstall"
-  !insertmacro driverinstaller "/r a"
+  !insertmacro driverinstaller "/r"
   
   ${If} ${RunningX64}
 	RMDir /r $PROGRAMFILES64\FuserFilesystemDriver  

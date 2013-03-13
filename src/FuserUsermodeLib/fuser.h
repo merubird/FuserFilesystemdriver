@@ -39,6 +39,7 @@ extern "C" {
 #else
   #define FUSERAPI
 #endif
+// TODO: check the removal of all FUSERAPI parameters
 
 #define FUSER_CALLBACK __stdcall
 

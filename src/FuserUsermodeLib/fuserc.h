@@ -17,6 +17,8 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+// TODO: change name of this file c=control = no longer exists
+
 #ifndef _FUSERC_H_
 #define _FUSERC_H_
 
@@ -30,8 +32,7 @@ extern "C" {
 #define FUSER_MOUNT_POINT_SUPPORTED_VERSION 600 // TODO: Remove this
 #define FUSER_SECURITY_SUPPORTED_VERSION	600 // TODO: Remove this
 
-#define FUSER_DRIVER_SERVICE			L"FuserDeviceDriver"
-#define FUSER_AGENT_SERVICE				L"FuserDeviceAgent"
+
 
 #define FUSER_GLOBAL_DEVICE_NAME    	L"\\\\.\\FuserSystem" //local ressource refere to FUSER_GLOBAL_SYMBOLIC_LINK_NAME
 #define FUSER_AGENT_CONTROL_PIPE		L"\\\\.\\pipe\\FuserDeviceAgentCommand" //communication with FuserDeviceAgent
@@ -55,9 +56,6 @@ extern "C" {
 
 
 
-#define FUSER_SERVICE_START		1
-#define FUSER_SERVICE_STOP		2
-#define FUSER_SERVICE_DELETE	3
 
 #define FUSER_KEEPALIVE_TIME	3000 // in miliseconds       // TODO: should be moved to .NET class
 

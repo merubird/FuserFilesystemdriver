@@ -26,7 +26,7 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <process.h>
-#include "mount.h"
+#include "FuserDeviceAgent.h"
 
 #include "fuser.h"
 #include "public.h"

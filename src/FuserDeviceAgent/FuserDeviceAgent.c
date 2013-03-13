@@ -22,502 +22,412 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-// TODO: Add service note, meaningful text
-
-
 #include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <sddl.h>
-#include "mount.h"
-#include "public.h"
+#include <shellapi.h>
+#include "FuserDeviceAgent.h"
 
-static HANDLE                g_EventControl = NULL;
-static SERVICE_STATUS        g_ServiceStatus;
-static SERVICE_STATUS_HANDLE g_StatusHandle = NULL;
+#define MAX_BUFFER_SIZE 2048
 
-static CRITICAL_SECTION	g_CriticalSection;
-static LIST_ENTRY		g_MountList;
+#define SERVICECONTROL_START    1
+#define SERVICECONTROL_STOP     2
+#define SERVICECONTROL_DELETE   3
 
 
-BOOL g_DebugMode = TRUE;
-BOOL g_UseStdErr = FALSE;
+// TODO: Include a function so that the driver can be unloaded -> update without reboot
 
-
-
-static DWORD WINAPI HandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext)
+VOID DisplayMessage(LPCWSTR message)
 {
-	switch (dwControl) {
-	case SERVICE_CONTROL_STOP:
+    int msgboxID = MessageBox(
+        NULL,
+        message,
+        (LPCWSTR)L"Fuser Device Agent - Info",
+        MB_OK
+    );
 
-		g_ServiceStatus.dwWaitHint     = 50000;
-		g_ServiceStatus.dwCheckPoint   = 0;
-		g_ServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
-		SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+   return;
+}
+VOID DisplayWarning(LPCWSTR message)
+{
+    int msgboxID = MessageBox(
+        NULL,
+        message,
+        (LPCWSTR)L"Fuser Device Agent - Warning",
+        MB_OK + MB_ICONWARNING
+    );
 
-		SetEvent(g_EventControl);
+   return;
+}
 
-		break;
+VOID ShowMountList()
+{	
+	WCHAR  buffer[MAX_BUFFER_SIZE];
+	WCHAR  partBuff[MAX_BUFFER_SIZE];
+
+	FUSER_CONTROL control;
+	ULONG index = 0;
+	ZeroMemory(&control, sizeof(FUSER_CONTROL));
+	ZeroMemory(buffer, sizeof(buffer));	
+
+	control.Type = FUSER_CONTROL_LIST;
+	control.Option = 0;
+	control.Status = FUSER_CONTROL_SUCCESS;
+
+	wcscpy_s(buffer, MAX_BUFFER_SIZE, L"Mountpoint list:\n\n");
 	
-	case SERVICE_CONTROL_INTERROGATE:
-		SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
-		break;
-
-	default:
-		break;
-	}
-
-	return NO_ERROR;
-}
-
-
-
-
-static VOID BuildSecurityAttributes(PSECURITY_ATTRIBUTES SecurityAttributes)
-{
-	LPTSTR sd = L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;WD)(A;;GR;;;RC)";
-
-	ZeroMemory(SecurityAttributes, sizeof(SECURITY_ATTRIBUTES));
-	
-	ConvertStringSecurityDescriptorToSecurityDescriptor(
-		sd,
-		SDDL_REVISION_1,
-		&SecurityAttributes->lpSecurityDescriptor,
-		NULL);
-
-	SecurityAttributes->nLength = sizeof(SECURITY_ATTRIBUTES);
-    SecurityAttributes->bInheritHandle = TRUE;
-}
-
-
-
-PMOUNT_ENTRY
-InsertMountEntry(PFUSER_CONTROL FuserControl)
-{
-	PMOUNT_ENTRY	mountEntry;
-	mountEntry = malloc(sizeof(MOUNT_ENTRY));
-	if (mountEntry == NULL) {
-		DbgPrintW(L"InsertMountEntry malloc failed\n");
-		return NULL;
-	}
-	ZeroMemory(mountEntry, sizeof(MOUNT_ENTRY));
-	CopyMemory(&mountEntry->MountControl, FuserControl, sizeof(FUSER_CONTROL));
-	InitializeListHead(&mountEntry->ListEntry);
-
-	EnterCriticalSection(&g_CriticalSection);
-	InsertTailList(&g_MountList, &mountEntry->ListEntry);
-	LeaveCriticalSection(&g_CriticalSection);
-
-	return mountEntry;
-}
-
-
-PMOUNT_ENTRY
-FindMountEntry(PFUSER_CONTROL	FuserControl)
-{
-	PLIST_ENTRY		listEntry;
-	PMOUNT_ENTRY	mountEntry;
-	BOOL			useMountPoint = wcslen(FuserControl->MountPoint) > 0;
-	BOOL			found = FALSE;
-
-	if (!useMountPoint && wcslen(FuserControl->DeviceName) == 0) {
-		return NULL;
-	}
-
-	EnterCriticalSection(&g_CriticalSection);
-
-    for (listEntry = g_MountList.Flink; listEntry != &g_MountList; listEntry = listEntry->Flink) {
-		mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
-		if (useMountPoint) {
-			if (wcscmp(FuserControl->MountPoint, mountEntry->MountControl.MountPoint) == 0) {
-				found = TRUE;
-				break;
-			}
-		} else {
-			if (wcscmp(FuserControl->DeviceName, mountEntry->MountControl.DeviceName) == 0) {
-				found = TRUE;
-				break;
-			}
-		}
-	}
-
-	LeaveCriticalSection(&g_CriticalSection);
-
-	if (found) {
-		DbgPrintW(L"FindMountEntry %s -> %s\n",
-			mountEntry->MountControl.MountPoint, mountEntry->MountControl.DeviceName);
-		return mountEntry;
-	} else {
-		return NULL;
-	}
-}
-
-
-VOID
-RemoveMountEntry(PMOUNT_ENTRY MountEntry)
-{
-	EnterCriticalSection(&g_CriticalSection);
-	RemoveEntryList(&MountEntry->ListEntry);
-	LeaveCriticalSection(&g_CriticalSection);
-
-	free(MountEntry);
-}
-
-
-VOID
-FuserControlFind(PFUSER_CONTROL Control)
-{
-	PLIST_ENTRY		listEntry;
-	PMOUNT_ENTRY	mountEntry;
-
-	mountEntry = FindMountEntry(Control);
-	if (mountEntry == NULL) {
-		Control->Status = FUSER_CONTROL_FAIL;
-	} else {
-		wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-				mountEntry->MountControl.DeviceName);
-		wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
-				mountEntry->MountControl.MountPoint);
-		Control->Status = FUSER_CONTROL_SUCCESS;
-	}
-}
-
-
-
-
-VOID
-FuserControlList(PFUSER_CONTROL Control)
-{
-	PLIST_ENTRY		listEntry;
-	PMOUNT_ENTRY	mountEntry;
-	ULONG			index = 0;
-
-	EnterCriticalSection(&g_CriticalSection);
-	Control->Status = FUSER_CONTROL_FAIL;
-
-	for (listEntry = g_MountList.Flink;
-		listEntry != &g_MountList;
-		listEntry = listEntry->Flink) {
-		mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
-		if (Control->Option == index++) {
-			wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-					mountEntry->MountControl.DeviceName);
-			wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
-					mountEntry->MountControl.MountPoint);
-			Control->Status = FUSER_CONTROL_SUCCESS;
-			break;
-		}
-	}
-	LeaveCriticalSection(&g_CriticalSection);
-}
-
-
-
-static VOID FuserControl(PFUSER_CONTROL Control)
-{
-	PMOUNT_ENTRY	mountEntry;
-	ULONG	index = 0;
-	DWORD written = 0;
-	Control->Status = FUSER_CONTROL_FAIL;
-
-	switch (Control->Type)
-	{
-	case FUSER_CONTROL_MOUNT:
-
-		DbgPrintW(L"FuserControl Mount\n");
-
-		
-		if (FuserControlMount(Control->MountPoint, Control->DeviceName )) {			
-			Control->Status = FUSER_CONTROL_SUCCESS;
-			mountEntry = InsertMountEntry(Control);
-			if (Control->Option == 1) {
-				// enable heartbeat-control:
-				HeartbeatStart(mountEntry);
-			}			
-		} else {
-			Control->Status = FUSER_CONTROL_FAIL;
-		}
-		break;
-
-	case FUSER_CONTROL_UNMOUNT:
-
-		DbgPrintW(L"FuserControl Unmount\n");
-
-		mountEntry = FindMountEntry(Control);
-
-		if (mountEntry == NULL) {
-			if (Control->Option == FUSER_CONTROL_OPTION_FORCE_UNMOUNT &&
-				FuserControlUnmount(Control->MountPoint)) {
-				Control->Status = FUSER_CONTROL_SUCCESS;
-				break;
-			}
-			Control->Status = FUSER_CONTROL_FAIL;
-			break;	
-		}
-
-		if (FuserControlUnmount(mountEntry->MountControl.MountPoint)) {
-			Control->Status = FUSER_CONTROL_SUCCESS;
-			if (wcslen(Control->DeviceName) == 0) {
-				wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-						mountEntry->MountControl.DeviceName);
-			}
-			HeartbeatStop(mountEntry);
-			RemoveMountEntry(mountEntry);
-		} else {
-			mountEntry->MountControl.Status = FUSER_CONTROL_FAIL;
-			Control->Status = FUSER_CONTROL_FAIL;
-		}
-
-		break;
-	case FUSER_CONTROL_CHECK:
-		{
-			DbgPrint("FuserControl Check\n");
-			Control->Status = 0;
-		}
-		break;
-	case FUSER_CONTROL_FIND:
-		{
-			DbgPrintW(L"FuserControl Find\n");
-			FuserControlFind(Control);
-		}
-		break;
-	case FUSER_CONTROL_LIST:
-		{
-			DbgPrintW(L"FuserControl List\n");
-			FuserControlList(Control);
-		}
-		break;
-	
-	case FUSER_CONTROL_HEARTBEAT:
-		{			
-			mountEntry = FindMountEntry(Control);
-			if (mountEntry == NULL) {
-				Control->Status = FUSER_CONTROL_FAIL;
-				break;	
-			}
-			HeartbeatSetAliveSignal(mountEntry);
-			Control->Status = FUSER_CONTROL_SUCCESS;
-		}
-		break;
-
-	default:
-		DbgPrintW(L"FuserControl UnknownType %u\n", Control->Type);
-	}
-	return;
-}
-
-
-
-VOID
-UnmountAll()
-{
-	PLIST_ENTRY		listEntry;
-	PMOUNT_ENTRY	mountEntry;
-	PMOUNT_ENTRY	umEntry;
-	ULONG			index = 0;
-	FUSER_CONTROL 	control;
-
-	while(1){		
-		umEntry = NULL;
-		
-		
-		EnterCriticalSection(&g_CriticalSection);
-		for (listEntry = g_MountList.Flink;
-			listEntry != &g_MountList;
-			listEntry = listEntry->Flink) {
-			mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
-			if (mountEntry != NULL) {
-				umEntry = mountEntry;
-				break;
-			}
-		}
-		LeaveCriticalSection(&g_CriticalSection);
-		
-		
-		if (umEntry == NULL){
-			break;
-		} else {
-			ZeroMemory(&control, sizeof(FUSER_CONTROL));
-			control.Type = FUSER_CONTROL_UNMOUNT;
+	while(FuserMountControl(&control)) {
+		if (control.Status == FUSER_CONTROL_SUCCESS) {
+			ZeroMemory(partBuff, sizeof(partBuff));
+			_snwprintf(partBuff,100, L"[%d] MountPoint: %s  \t> DeviceName: %s\n",
+				control.Option, control.MountPoint, control.DeviceName);
 						
-			wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), umEntry->MountControl.DeviceName);
-			wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), umEntry->MountControl.MountPoint);
-		
-			FuserControl(&control);
-			if (control.Status == FUSER_CONTROL_SUCCESS){
-				SendReleaseIRP(control.DeviceName);
-			} else {
-				break;
-			}
+			wcscat_s(buffer, MAX_BUFFER_SIZE, partBuff);				
+			control.Option++;
+		} else {
+			break;
 		}
-		
-		
 	}
 	
+	if (control.Option == 0){
+		wcscpy_s(buffer, MAX_BUFFER_SIZE, L"No Devices are mounted!\n");
+	}
+	
+		
+	DisplayMessage(buffer);
+	return;	
+}
 
+int ServiceControl(LPCWSTR ServiceName, ULONG Type) {
+	SC_HANDLE controlHandle;
+	SC_HANDLE serviceHandle;
+	SERVICE_STATUS ss;
+	int ret = 0; // may only assign x0 numbers
+	
+
+	controlHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+
+	if (controlHandle == NULL) {		
+		return 10;
+	}
+
+	serviceHandle = OpenService(controlHandle, ServiceName, SERVICE_START | SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
+
+	if (serviceHandle == NULL) {		
+		CloseServiceHandle(controlHandle);
+		return 20;
+	}
+	
+	QueryServiceStatus(serviceHandle, &ss);
+	
+	if (Type == SERVICECONTROL_DELETE) {
+		if (DeleteService(serviceHandle)) {
+			ret = 0;
+		} else {
+			ret = 30;
+		}
+	} else if (ss.dwCurrentState == SERVICE_RUNNING && Type == SERVICECONTROL_STOP) {		
+		if (ControlService(serviceHandle, SERVICE_CONTROL_STOP, &ss)) {			
+			ret = 0;
+		} else {			
+			ret = 40;
+		}
+	} else if (ss.dwCurrentState == SERVICE_STOPPED && Type == SERVICECONTROL_START) {
+		if (StartService(serviceHandle, 0, NULL)) {
+			ret = 0;
+		} else {
+			ret = 50;
+		}
+	}
+	
+	CloseServiceHandle(serviceHandle);
+	CloseServiceHandle(controlHandle);
+
+	Sleep(100);
+	return ret;
+}
+
+int ServiceInstall(LPCWSTR ServiceName, DWORD ServiceType, LPCWSTR ServicePath){
+	SC_HANDLE	controlHandle;
+	SC_HANDLE	serviceHandle;
+	SERVICE_DESCRIPTION sd;
+	int tmp;
+
+	controlHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
+	if (controlHandle == NULL) {
+		return 1;
+	}
+
+	serviceHandle = CreateService(controlHandle, ServiceName, ServiceName, 0,
+		ServiceType, SERVICE_AUTO_START, SERVICE_ERROR_IGNORE,
+		ServicePath, NULL, NULL, NULL, NULL, NULL);
+
+	if (serviceHandle == NULL) {		
+		tmp = GetLastError();
+		CloseServiceHandle(controlHandle);
+		
+		if (tmp == ERROR_SERVICE_EXISTS) {
+			return 2;
+		} else {
+			return 3;
+		}
+	}	
+	
+	CloseServiceHandle(serviceHandle);
+	CloseServiceHandle(controlHandle);
+	
+	return ServiceControl(ServiceName, SERVICECONTROL_START);
+}
+
+BOOL ChangeServiceDescription(LPCWSTR ServiceName, LPWSTR ServiceDescription)
+{
+    SC_HANDLE controlHandle;
+    SC_HANDLE serviceHandle;
+    SERVICE_DESCRIPTION sd;
+	BOOL ret = FALSE;
+    
+    // Get a handle to the SCM database. 
+
+    controlHandle = OpenSCManager( 
+        NULL,                    // local computer
+        NULL,                    // ServicesActive database 
+        SC_MANAGER_ALL_ACCESS);  // full access rights 
+ 
+    if (NULL == controlHandle) 
+    {        
+        return FALSE;
+    }
+
+    // Get a handle to the service.
+
+    serviceHandle = OpenService( 
+        controlHandle,            // SCM database 
+        ServiceName,               // name of service 
+        SERVICE_CHANGE_CONFIG);  // need change config access 
+ 
+    if (serviceHandle == NULL)
+    {         
+        CloseServiceHandle(controlHandle);
+        return FALSE;
+    }    
+
+    // Change the service description.
+    sd.lpDescription = ServiceDescription;
+
+    if( ChangeServiceConfig2(
+        serviceHandle,                 // handle to service
+        SERVICE_CONFIG_DESCRIPTION, // change: description
+        &sd) )                      // new description
+    {
+        ret = TRUE;
+    }
+    
+
+    CloseServiceHandle(serviceHandle); 
+    CloseServiceHandle(controlHandle);
+	return ret;
 }
 
 
 
+BOOL ServiceCheck(LPCWSTR ServiceName){
+	SC_HANDLE controlHandle;
+	SC_HANDLE serviceHandle;
+	SERVICE_STATUS ss;
 
+	controlHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
 
-static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
-{
-	DWORD			eventNo;
-	HANDLE			pipe, device;
-	HANDLE			eventConnect, eventUnmount;
-	HANDLE			eventArray[3];
-	FUSER_CONTROL	control, unmount;
-	OVERLAPPED		ov, driver;
-	ULONG			returnedBytes;
-	EVENT_CONTEXT	eventContext;
-	SECURITY_ATTRIBUTES sa;
-
-#if _MSC_VER < 1300
-	InitializeCriticalSection(&g_CriticalSection);
-#else
-	InitializeCriticalSectionAndSpinCount(&g_CriticalSection, 0x80000400);
-#endif
-	InitializeListHead(&g_MountList);
-	
-	g_StatusHandle = RegisterServiceCtrlHandlerEx(FUSER_AGENT_SERVICE, HandlerEx, NULL); // TODO: Change name
-	
-
-	// extend completion time
-	g_ServiceStatus.dwServiceType				= SERVICE_WIN32_OWN_PROCESS;
-	g_ServiceStatus.dwWin32ExitCode				= NO_ERROR;
-	g_ServiceStatus.dwControlsAccepted			= SERVICE_ACCEPT_STOP;
-	g_ServiceStatus.dwServiceSpecificExitCode	= 0;
-	g_ServiceStatus.dwWaitHint					= 30000;
-	g_ServiceStatus.dwCheckPoint				= 1;
-	g_ServiceStatus.dwCurrentState				= SERVICE_START_PENDING;
-	SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
-
-	BuildSecurityAttributes(&sa);
-
-	pipe = CreateNamedPipe(FUSER_AGENT_CONTROL_PIPE,
-		PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED, 
-		PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-		1, sizeof(control), sizeof(control), 1000, &sa);
-
-	if (pipe == INVALID_HANDLE_VALUE) {
-		// TODO: should do something
-		DbgPrintW(L"DeviceAgent: failed to create named pipe: %d\n", GetLastError());
+	if (controlHandle == NULL) {		
+		return FALSE;
 	}
 
-	device = CreateFile(
-				FUSER_GLOBAL_DEVICE_NAME,			// lpFileName
-				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
-				FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
-				NULL,                               // lpSecurityAttributes
-				OPEN_EXISTING,                      // dwCreationDistribution
-				FILE_FLAG_OVERLAPPED,               // dwFlagsAndAttributes
-				NULL                                // hTemplateFile
-			);
+	serviceHandle = OpenService(controlHandle, ServiceName, SERVICE_START | SERVICE_STOP | SERVICE_QUERY_STATUS);
+
+	if (serviceHandle == NULL) {
+		CloseServiceHandle(controlHandle);
+		return FALSE;
+	}
 	
-	if (device == INVALID_HANDLE_VALUE) {
-		// TODO: should do something
-		DbgPrintW(L"DeviceAgent: failed to open device: %d\n", GetLastError());
-	}
+	CloseServiceHandle(serviceHandle);
+	CloseServiceHandle(controlHandle);
 
-	eventConnect = CreateEvent(NULL, FALSE, FALSE, NULL);
-	eventUnmount = CreateEvent(NULL, FALSE, FALSE, NULL);
-	g_EventControl = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	g_ServiceStatus.dwWaitHint     = 0;
-	g_ServiceStatus.dwCheckPoint   = 0;
-	g_ServiceStatus.dwCurrentState = SERVICE_RUNNING;
-	SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
-
-	for (;;) {
-		ZeroMemory(&ov, sizeof(OVERLAPPED));
-		ZeroMemory(&driver, sizeof(OVERLAPPED));
-		ZeroMemory(&eventContext, sizeof(EVENT_CONTEXT));
-
-		ov.hEvent = eventConnect;
-		driver.hEvent = eventUnmount;
-		ConnectNamedPipe(pipe, &ov);
-		if (!DeviceIoControl(device, IOCTL_SERVICE_WAIT, NULL, 0,
-			&eventContext, sizeof(EVENT_CONTEXT), NULL, &driver)) {
-			DWORD error = GetLastError();
-			if (error != 997) {
-				DbgPrintW(L"DeviceAgent: DeviceIoControl error: %d\n", error);
-			}
-		}
-
-		eventArray[0] = eventConnect;
-		eventArray[1] = eventUnmount;
-		eventArray[2] = g_EventControl;
-
-		eventNo = WaitForMultipleObjects(3, eventArray, FALSE, INFINITE) - WAIT_OBJECT_0;
-
-		DbgPrintW(L"DeviceAgent: get an event\n");
-		if (eventNo == 0) {
-
-			DWORD result = 0;
-
-			ZeroMemory(&control, sizeof(control));
-			if (ReadFile(pipe, &control, sizeof(control), &result, NULL)) {
-				FuserControl(&control);
-				WriteFile(pipe, &control, sizeof(control), &result, NULL);
-			}
-			FlushFileBuffers(pipe);
-			DisconnectNamedPipe(pipe);
-		} else if (eventNo == 1) {
-
-			if (GetOverlappedResult(device, &driver, &returnedBytes, FALSE)) {
-				if (returnedBytes == sizeof(EVENT_CONTEXT)) {
-					DbgPrintW(L"DeviceAgent: Unmount\n");
-
-					ZeroMemory(&unmount, sizeof(FUSER_CONTROL));
-					unmount.Type = FUSER_CONTROL_UNMOUNT;
-					wcscpy_s(unmount.DeviceName, sizeof(unmount.DeviceName) / sizeof(WCHAR),
-							eventContext.Unmount.DeviceName);
-					FuserControl(&unmount);
-				} else {
-					DbgPrintW(L"DeviceAgent: Unmount error\n", control.Type);
-				}
-			}
-
-		} else if (eventNo == 2) {		
-			UnmountAll(); // Removes all mounts before terminating
-		
-			DbgPrintW(L"DeviceAgent: stop Agent service\n");
-			g_ServiceStatus.dwWaitHint     = 0;
-			g_ServiceStatus.dwCheckPoint   = 0;
-			g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;			
-			SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
-
-			break;
-		}
-		else
-			break;
-	}
-
-
-	CloseHandle(pipe);
-	CloseHandle(eventConnect);
-	CloseHandle(g_EventControl);
-	CloseHandle(device);
-	CloseHandle(eventUnmount);
-
-	DeleteCriticalSection(&g_CriticalSection);
-	return;
+	return TRUE;
 }
 
+int ServiceUninstall(LPCWSTR ServiceName) {
+	if (ServiceCheck(ServiceName)) {
+		ServiceControl(ServiceName, SERVICECONTROL_STOP);
+		return ServiceControl(ServiceName, SERVICECONTROL_DELETE);
+	}
+	return 0;	
+}
 
+int DriverInstallation(BOOL showMessage){
+	WCHAR  driverPath[MAX_PATH];
+	WCHAR  deviceAgentPath[MAX_PATH];
+	WCHAR  buffer[MAX_BUFFER_SIZE];	
+	int ret = 0;
+		
+	ZeroMemory(driverPath, sizeof(driverPath));
+	ZeroMemory(deviceAgentPath, sizeof(deviceAgentPath)); 
+	ZeroMemory(buffer, sizeof(buffer));
+	
+	GetModuleFileName(NULL, deviceAgentPath, MAX_PATH);
+	wcscat_s(deviceAgentPath, MAX_PATH, L" /s");  
+	
 
+	GetSystemDirectory(driverPath, MAX_PATH);
+	wcscat_s(driverPath, MAX_PATH, L"\\drivers\\fuser.sys");
 
-int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hinstPrev, LPSTR lpszCmdLine, int nCmdShow)
-{
-	SERVICE_TABLE_ENTRY serviceTable[] = {
-		{L"DeviceAgent", ServiceMain}, {NULL, NULL}
-	};
-
-	StartServiceCtrlDispatcher(serviceTable);
+	if (showMessage){
+		_snwprintf(buffer,MAX_BUFFER_SIZE,	L"Installation start with the follow parameters:\n" \
+											L"Driver-Path: \t%s\n" \
+											L"DeviceAgent-Path: \t%s\n"
+											, driverPath, deviceAgentPath);
+		DisplayMessage(buffer);
+	}
+	
+	ret = ServiceInstall(SERVICE_NAME_DRIVER, SERVICE_FILE_SYSTEM_DRIVER, driverPath);
+	if (ret != 0){
+		if (showMessage){
+			ZeroMemory(buffer, sizeof(buffer));
+			_snwprintf(buffer,MAX_BUFFER_SIZE,	L"Driver installation failed! Errorcode: %d" , ret);
+			DisplayWarning(buffer);
+		}
+		return 1000 + ret;
+	}
+	
+	
+	ret = ServiceInstall(SERVICE_NAME_AGENT, SERVICE_WIN32_OWN_PROCESS, deviceAgentPath);
+	if (ret != 0){		
+		if (showMessage){
+			ZeroMemory(buffer, sizeof(buffer));
+			_snwprintf(buffer,MAX_BUFFER_SIZE,	L"DeviceAgent installation failed! Errorcode: %d" , ret);
+			DisplayWarning(buffer);
+		}
+		return 2000 + ret;
+	}
+	ChangeServiceDescription(SERVICE_NAME_AGENT, SERVICEDESCRIPTION);
+	
+	
 	return 0;
 }
 
-/* TODO: Obsolete and can be removed
-static HANDLE	g_EventLog = NULL;
-*/
+
+int DriverUninstallation(BOOL showMessage){
+	WCHAR  buffer[MAX_BUFFER_SIZE];	
+	int ret = 0;
+	
+	//ZeroMemory(buffer, sizeof(buffer));
+
+	ret = ServiceUninstall(SERVICE_NAME_AGENT);
+	if (ret != 0){
+		if (showMessage){
+			ZeroMemory(buffer, sizeof(buffer));
+			_snwprintf(buffer,MAX_BUFFER_SIZE,	L"DeviceAgent uninstallation failed! Errorcode: %d" , ret);
+			DisplayWarning(buffer);
+		}
+		return 2000 + ret;
+	}
+
+	ret = ServiceUninstall(SERVICE_NAME_DRIVER); 
+	if (ret != 0){
+		if (showMessage){
+			ZeroMemory(buffer, sizeof(buffer));
+			_snwprintf(buffer,MAX_BUFFER_SIZE,	L"Driver uninstallation failed! Errorcode: %d" , ret);
+			DisplayWarning(buffer);
+		}
+		return 1000 + ret;
+	}
+
+	return ret;
+}
+
+VOID ShowVersion(){
+	WCHAR  buffer[MAX_BUFFER_SIZE];	
+	ZeroMemory(buffer, sizeof(buffer));
+
+	// TODO: replace versions:
+	_snwprintf(buffer,MAX_BUFFER_SIZE,	L"Fuser version : %d\n" \
+										L"Fuser driver version : 0x%X\n"
+								 , FuserVersion()  ,  FuserDriverVersion());
+	DisplayMessage(buffer);
+}
+
+int ExecuteCommand(LPWSTR *ParamList, int CountParam){
+	if( ParamList != NULL && CountParam > 1) {
+		if (CountParam >= 2){
+		
+			if (_wcsicmp(ParamList[1], L"/s") == 0){			
+				//service-mode
+				StartServiceMode();
+				return 0;
+			}
+				
+			if (_wcsicmp(ParamList[1], L"/v") == 0){			
+				//Show Version-Info
+				ShowVersion();				
+				return 0;
+			}
+
+			if (_wcsicmp(ParamList[1], L"/l") == 0){
+				//List all mounted devices
+				ShowMountList();				
+				return 0;
+			}
+			
+			if (_wcsicmp(ParamList[1], L"/i") == 0){
+				//install the driver:
+				return DriverInstallation(FALSE);
+			}
+			
+			if (_wcsicmp(ParamList[1], L"/r") == 0){
+				//remove the driver:
+				return DriverUninstallation(FALSE);
+			}
+		}
+		
+		if (CountParam >= 3){
+			if (_wcsicmp(ParamList[1], L"/u") == 0){
+				if (FuserRemoveMountPoint(ParamList[2])){
+					return 0;
+				} else {
+					return 1;
+				}
+			}
+		}
+	}
+	
+	DisplayMessage(  		
+		L"FuserDeviceAgent.exe /u MountPoint \n" \
+		L"FuserDeviceAgent.exe /l\n" \
+		L"FuserDeviceAgent.exe /i\n" \
+		L"FuserDeviceAgent.exe /r\n" \
+		L"FuserDeviceAgent.exe /v\n" \
+		L"\n" \
+		L"Example:\n" \
+		L"  /u X:             \t> Unmount mount X:\n" \
+		L"  /u C:\\fuser      \t> Unmount mount C:\\fuser\n" \
+		L"  /l                \t> Show list of active mountpoints\n" \
+		L"  /i                \t> Install Systemdriver and DeviceAgent\n" \
+		L"  /r                \t> Remove Systemdriver and DeviceAgent\n" \
+		L"  /v                \t> Show Fuser Systemdriver Version\n"
+	);		
+	return 2; //Not supported Parameter
+}
+
+
+int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hinstPrev, LPSTR lpszCmdLine, int nCmdShow)
+{  
+	LPWSTR *szArglist;
+	int nArgs;	
+	int ret = 1; //Unknown error
+	
+	szArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);   
+	if( szArglist != NULL )
+	{
+		ret = ExecuteCommand(szArglist, nArgs);
+		LocalFree(szArglist); // Free memory allocated for CommandLineToArgvW arguments.
+	}   
+	
+	return ret;	
+}

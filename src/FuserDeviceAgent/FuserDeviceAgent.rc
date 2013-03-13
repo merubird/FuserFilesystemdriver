@@ -8,6 +8,6 @@
 #define VER_TITEL                   "Device Agent"
 #define VER_INTERNALNAME_STR        "FuserDeviceAgent.exe"
 
-//MAIN               ICON    DISCARDABLE     "TESTVER.ICO"
+FUSER       ICON    DISCARDABLE     "..\_general\ICON\FUSER.ICO"
 
 #include "..\_general\general.ver"
