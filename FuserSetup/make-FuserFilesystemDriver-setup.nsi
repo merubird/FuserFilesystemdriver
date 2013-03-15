@@ -2,6 +2,7 @@
 
 ;--------------------------------
 ; Includes
+    !include "..\src\_general\version.h"
 
 	!include LogicLib.nsh
 	!include x64.nsh
@@ -9,17 +10,16 @@
 		
 	!include scripts\languages.nsi
 
+	; !finalize 'scripts\sign.bat %1'
 ;--------------------------------
-
 
 
 
 ;--------------------------------
 ; Version Information
 
-	!define VERSION "pre0.0.E"
-	;VIProductVersion "${VERSION}"
-	VIProductVersion "1.2.3.4"
+	!define VERSION "${VER_MAJOR}.${VER_MINOR}.${VER_REVISION}"
+	VIProductVersion "${VERSION}.0"	
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "FuserFilesystem Driver Setup"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "Comments" "Fuser Filesystem Driver - simulates virtual drives"
 	VIAddVersionKey /LANG=${LANG_ENGLISH} "CompanyName" "Christian Auer"
@@ -53,6 +53,7 @@
 	UninstPage instfiles
 
 ;--------------------------------
+
 
 
 
@@ -198,7 +199,7 @@ Section "Fuser Kernel-Mode-Driver x86" section_x86_driver
 SectionEnd
 
 
-Section "Fuser Kernel-Mode-Driver amd64" section_x64_driver
+Section "Fuser Kernel-Mode-Driver x64" section_x64_driver
   ${If} ${IsWin7}
     !insertmacro X64Driver "win7"
   ${ElseIf} ${IsWin2008R2}
@@ -294,14 +295,14 @@ Function .onInit
       IfFileExists $SYSDIR\drivers\fuser.sys HasPreviousVersionX64 NoPreviousVersionX64
       ; To make EnableX64FSRedirection called in both cases, needs duplicated MessageBox code. How can I avoid this?
       HasPreviousVersionX64:
-        MessageBox MB_OK "Please unstall the previous version and restart your computer before running this installer."
+        MessageBox MB_OK "Please uninstall the previous version and restart your computer before try again."
         Abort
       NoPreviousVersionX64:
     ${EnableX64FSRedirection}
   ${Else}
     IfFileExists $SYSDIR\drivers\fuser.sys HasPreviousVersion NoPreviousVersion
     HasPreviousVersion:
-      MessageBox MB_OK "Please unstall the previous version and restart your computer before running this installer."
+      MessageBox MB_OK "Please uninstall the previous version and restart your computer before try again."
       Abort
     NoPreviousVersion:
   ${EndIf}
@@ -320,4 +321,6 @@ Function .onInstSuccess
     
   noshellopen:
 FunctionEnd
+
+
 

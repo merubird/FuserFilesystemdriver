@@ -313,6 +313,106 @@ FuserFillDirectoryInformation(
 
 
 
+// check whether Name matches Expression
+// Expression can contain "?"(any one character) and "*" (any string)
+// when IgnoreCase is TRUE, do case insenstive matching
+//
+// http://msdn.microsoft.com/en-us/library/ff546850(v=VS.85).aspx
+// * (asterisk) Matches zero or more characters.
+// ? (question mark) Matches a single character.
+// DOS_DOT Matches either a period or zero characters beyond the name string.
+// DOS_QM Matches any single character or, upon encountering a period or end
+//        of name string, advances the expression to the end of the set of
+//        contiguous DOS_QMs.
+// DOS_STAR Matches zero or more characters until encountering and matching
+//          the final . in the name.
+// TODO: perhaps remove this method
+BOOL FuserIsNameInExpression(
+	LPCWSTR		Expression, // matching pattern
+	LPCWSTR		Name, // file name
+	BOOL		IgnoreCase)
+{
+	ULONG ei = 0;
+	ULONG ni = 0;
+
+	while (Expression[ei] != '\0') {
+
+		if (Expression[ei] == L'*') {
+			ei++;
+			if (Expression[ei] == '\0')
+				return TRUE;
+
+			while (Name[ni] != '\0') {
+				if (FuserIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
+					return TRUE;
+				ni++;
+			}
+
+		} else if (Expression[ei] == DOS_STAR) {
+
+			ULONG p = ni;
+			ULONG lastDot = 0;
+			ei++;
+			
+			while (Name[p] != '\0') {
+				if (Name[p] == L'.')
+					lastDot = p;
+				p++;
+			}
+			
+
+			while (TRUE) {
+				if (Name[ni] == '\0' || ni == lastDot)
+					break;
+
+				if (FuserIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
+					return TRUE;
+				ni++;
+			}
+			
+		} else if (Expression[ei] == DOS_QM)  {
+			
+			ei++;
+			if (Name[ni] != L'.') {
+				ni++;
+			} else {
+
+				ULONG p = ni + 1;
+				while (Name[p] != '\0') {
+					if (Name[p] == L'.')
+						break;
+					p++;
+				}
+
+				if (Name[p] == L'.')
+					ni++;
+			}
+
+		} else if (Expression[ei] == DOS_DOT) {
+			ei++;
+
+			if (Name[ni] == L'.')
+				ni++;
+
+		} else {
+			if (Expression[ei] == L'?') {
+				ei++; ni++;
+			} else if(IgnoreCase && towupper(Expression[ei]) == towupper(Name[ni])) {
+				ei++; ni++;
+			} else if(!IgnoreCase && Expression[ei] == Name[ni]) {
+				ei++; ni++;
+			} else {
+				return FALSE;
+			}
+		}
+	}
+
+	if (ei == wcslen(Expression) && ni == wcslen(Name))
+		return TRUE;
+	
+
+	return FALSE;
+}
 
 
 
@@ -546,107 +646,6 @@ DispatchDirectoryInformation(
 
 
 
-// check whether Name matches Expression
-// Expression can contain "?"(any one character) and "*" (any string)
-// when IgnoreCase is TRUE, do case insenstive matching
-//
-// http://msdn.microsoft.com/en-us/library/ff546850(v=VS.85).aspx
-// * (asterisk) Matches zero or more characters.
-// ? (question mark) Matches a single character.
-// DOS_DOT Matches either a period or zero characters beyond the name string.
-// DOS_QM Matches any single character or, upon encountering a period or end
-//        of name string, advances the expression to the end of the set of
-//        contiguous DOS_QMs.
-// DOS_STAR Matches zero or more characters until encountering and matching
-//          the final . in the name.
-// TODO: perhaps remove this method
-BOOL FUSERAPI
-FuserIsNameInExpression(
-	LPCWSTR		Expression, // matching pattern
-	LPCWSTR		Name, // file name
-	BOOL		IgnoreCase)
-{
-	ULONG ei = 0;
-	ULONG ni = 0;
-
-	while (Expression[ei] != '\0') {
-
-		if (Expression[ei] == L'*') {
-			ei++;
-			if (Expression[ei] == '\0')
-				return TRUE;
-
-			while (Name[ni] != '\0') {
-				if (FuserIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
-					return TRUE;
-				ni++;
-			}
-
-		} else if (Expression[ei] == DOS_STAR) {
-
-			ULONG p = ni;
-			ULONG lastDot = 0;
-			ei++;
-			
-			while (Name[p] != '\0') {
-				if (Name[p] == L'.')
-					lastDot = p;
-				p++;
-			}
-			
-
-			while (TRUE) {
-				if (Name[ni] == '\0' || ni == lastDot)
-					break;
-
-				if (FuserIsNameInExpression(&Expression[ei], &Name[ni], IgnoreCase))
-					return TRUE;
-				ni++;
-			}
-			
-		} else if (Expression[ei] == DOS_QM)  {
-			
-			ei++;
-			if (Name[ni] != L'.') {
-				ni++;
-			} else {
-
-				ULONG p = ni + 1;
-				while (Name[p] != '\0') {
-					if (Name[p] == L'.')
-						break;
-					p++;
-				}
-
-				if (Name[p] == L'.')
-					ni++;
-			}
-
-		} else if (Expression[ei] == DOS_DOT) {
-			ei++;
-
-			if (Name[ni] == L'.')
-				ni++;
-
-		} else {
-			if (Expression[ei] == L'?') {
-				ei++; ni++;
-			} else if(IgnoreCase && towupper(Expression[ei]) == towupper(Name[ni])) {
-				ei++; ni++;
-			} else if(!IgnoreCase && Expression[ei] == Name[ni]) {
-				ei++; ni++;
-			} else {
-				return FALSE;
-			}
-		}
-	}
-
-	if (ei == wcslen(Expression) && ni == wcslen(Name))
-		return TRUE;
-	
-
-	return FALSE;
-}
 
 
 

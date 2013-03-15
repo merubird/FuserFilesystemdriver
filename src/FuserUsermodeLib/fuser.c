@@ -453,7 +453,7 @@ FuserStart(PFUSER_INSTANCE Instance)
 
 
 int FUSERAPI
-FuserMain(PFUSER_OPTIONS FuserOptions, PFUSER_OPERATIONS FuserOperations)
+FuserDeviceMount(PFUSER_OPTIONS FuserOptions, PFUSER_OPERATIONS FuserOperations)
 {
 	ULONG	threadNum = 0;
 	ULONG	i;
@@ -596,7 +596,7 @@ FuserMain(PFUSER_OPTIONS FuserOptions, PFUSER_OPERATIONS FuserOperations)
 
 
 
-
+/* TODO: Remove and check whether references should also be removed. ->IOCTL_SET_DEBUG_MODE
 BOOL
 FuserSetDebugMode(
 	ULONG	Mode)
@@ -611,7 +611,7 @@ FuserSetDebugMode(
 		0,
 		&returnedLength);
 }
-
+*/
 
 
 VOID
@@ -769,7 +769,7 @@ BOOL WINAPI DllMain(
 					PLIST_ENTRY entry = RemoveHeadList(&g_InstanceList);
 					PFUSER_INSTANCE instance =
 						CONTAINING_RECORD(entry, FUSER_INSTANCE, ListEntry);
-					FuserRemoveMountPoint(instance->MountPoint);
+					FuserDeviceUnmount(instance->MountPoint);
 					free(instance);
 
 				}

@@ -22,8 +22,8 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <process.h>
 #include "fuseri.h"
 
-
-BOOL FUSERAPI
+// TODO: Check method, is it still needed, use in heartbeat?
+BOOL 
 FuserResetTimeout(ULONG Timeout, PFUSER_FILE_INFO FileInfo)
 {
 	BOOL	status;
@@ -83,7 +83,7 @@ FuserSendHeartbeat(
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
 
-	status = FuserMountControl(&control);
+	status = FuserAgentControl(&control);
 	
 	return status;
 }

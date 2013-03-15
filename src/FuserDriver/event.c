@@ -449,7 +449,7 @@ FuserEventStart(
 	RtlCopyMemory(&eventStart, Irp->AssociatedIrp.SystemBuffer, sizeof(EVENT_START));
 	driverInfo = Irp->AssociatedIrp.SystemBuffer;
 
-	if (eventStart.UserVersion != FUSER_DRIVER_VERSION) {
+	if (eventStart.UserVersion != FUSER_DRIVER_VERSION) {// TODO: Change with BinaryVersion
 		driverInfo->DriverVersion = FUSER_DRIVER_VERSION;
 		driverInfo->Status = FUSER_START_FAILED;
 		Irp->IoStatus.Status = STATUS_SUCCESS;

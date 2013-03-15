@@ -19,7 +19,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "fuseri.h"
 #include "fileinfo.h"
-
+/* TODO: Method no longer exists, remove file and analyse content -> IOCTL_GET_ACCESS_TOKEN remove everywhere
 HANDLE FUSERAPI
 FuserOpenRequestorToken(PFUSER_FILE_INFO FileInfo)
 {
@@ -73,3 +73,4 @@ FuserOpenRequestorToken(PFUSER_FILE_INFO FileInfo)
 	free(eventInfo);
 	return handle;
 }
+*/

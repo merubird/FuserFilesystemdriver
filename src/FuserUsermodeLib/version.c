@@ -20,30 +20,49 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <windows.h>
 #include <stdio.h>
 #include "fuseri.h"
+#include "..\_general\version.h"
 
 
-ULONG FUSERAPI
-FuserVersion()
-{
-	return FUSER_VERSION;
+
+
+ULONG GetBinaryVersion(){
+	FUSER_VERSION_SINGLE version;
+	
+	version.FullValue.Major = VER_MAJOR;
+	version.FullValue.Minor = VER_MINOR;
+	version.FullValue.Revision = VER_REVISION;
+	
+	return version.SingleValue;
 }
 
 
-ULONG FUSERAPI
-FuserDriverVersion()
-{
-	ULONG version = 0;
+// check if the driver version is equal to this library-version, returns false if driver not running
+BOOL CheckDriverVersion() {
+	ULONG BinaryVersion = 0;
+		
 	ULONG ret = 0;	
 	if (SendToDevice(
 			FUSER_GLOBAL_DEVICE_NAME,
-			IOCTL_TEST,
+			IOCTL_GET_VERSION,
 			NULL, // InputBuffer
 			0, // InputLength
-			&version, // OutputBuffer
+			&BinaryVersion, // OutputBuffer
 			sizeof(ULONG), // OutputLength
 			&ret)) {
 
-		return version;
-	}		
-	return 0;
+		if (BinaryVersion != 0 && GetBinaryVersion() == BinaryVersion){
+			return TRUE;
+		}		
+	}
+	return FALSE;
+}
+
+	
+
+ULONG FUSERAPI FuserVersion() {
+	if (CheckDriverVersion()){
+		return GetBinaryVersion();
+	} else {
+		return 0;
+	}	
 }

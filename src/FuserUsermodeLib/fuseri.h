@@ -68,6 +68,8 @@ typedef struct _FUSER_OPEN_INFO {
 
 
 
+
+
 BOOL
 SendReleaseIRP(
 	LPCWSTR DeviceName);
@@ -140,6 +142,7 @@ ClearFindData(
   PLIST_ENTRY	ListHead);
 
 
+BOOL CheckDriverVersion(); // TODO: use this method! in each case before communication
 
   
 VOID

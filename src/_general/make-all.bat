@@ -2,6 +2,8 @@
 if NOT %1x == x goto start
 echo start make all?
 pause
+
+..\..\..\Tools\FuserVersionAutoincrement\FuserVersionAutoincrement\bin\Release\FuserVersionAutoincrement.exe ..\..\ auto silent
 %0 WAIT
 goto end
 :start

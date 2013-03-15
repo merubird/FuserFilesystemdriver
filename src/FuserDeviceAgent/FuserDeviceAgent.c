@@ -26,6 +26,8 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <shellapi.h>
 #include "FuserDeviceAgent.h"
+#include "public.h"
+#include "..\_general\version.h"
 
 #define MAX_BUFFER_SIZE 2048
 
@@ -75,7 +77,7 @@ VOID ShowMountList()
 
 	wcscpy_s(buffer, MAX_BUFFER_SIZE, L"Mountpoint list:\n\n");
 	
-	while(FuserMountControl(&control)) {
+	while(FuserAgentControl(&control)) {
 		if (control.Status == FUSER_CONTROL_SUCCESS) {
 			ZeroMemory(partBuff, sizeof(partBuff));
 			_snwprintf(partBuff,100, L"[%d] MountPoint: %s  \t> DeviceName: %s\n",
@@ -342,15 +344,34 @@ int DriverUninstallation(BOOL showMessage){
 	return ret;
 }
 
+
+ULONG GetBinaryVersion(){
+	FUSER_VERSION_SINGLE version;
+	
+	version.FullValue.Major = VER_MAJOR;
+	version.FullValue.Minor = VER_MINOR;
+	version.FullValue.Revision = VER_REVISION;
+	
+	return version.SingleValue;
+}
+
+
 VOID ShowVersion(){
 	WCHAR  buffer[MAX_BUFFER_SIZE];	
+	FUSER_VERSION_SINGLE ver;
 	ZeroMemory(buffer, sizeof(buffer));
-
-	// TODO: replace versions:
-	_snwprintf(buffer,MAX_BUFFER_SIZE,	L"Fuser version : %d\n" \
-										L"Fuser driver version : 0x%X\n"
-								 , FuserVersion()  ,  FuserDriverVersion());
-	DisplayMessage(buffer);
+	
+	ver.SingleValue = FuserVersion(); // TODO: check whether the value can be read out directly without using ULONG
+	if (ver.SingleValue == 0){		
+		DisplayWarning(L"Fuser Filesystemdriver does not work correct! Perhaps different driver parts installed or driver is not running.");
+	} else {
+		if (ver.SingleValue != GetBinaryVersion()){
+			DisplayWarning(L"Version of DeviceAgent is different to Filesystemdriver!");
+		} else {	
+			_snwprintf(buffer,MAX_BUFFER_SIZE,	L"Fuser version: %d.%d.%d\n"  , ver.FullValue.Major, ver.FullValue.Minor, ver.FullValue.Revision);
+			DisplayMessage(buffer);
+		}
+	}
 }
 
 int ExecuteCommand(LPWSTR *ParamList, int CountParam){
@@ -388,7 +409,7 @@ int ExecuteCommand(LPWSTR *ParamList, int CountParam){
 		
 		if (CountParam >= 3){
 			if (_wcsicmp(ParamList[1], L"/u") == 0){
-				if (FuserRemoveMountPoint(ParamList[2])){
+				if (FuserDeviceUnmount(ParamList[2])){
 					return 0;
 				} else {
 					return 1;

@@ -19,7 +19,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 // TODO: Check Fuser.def exports and check which are no longer needed, remove them in FuserNet as well.
 
-// TODO: FuserUnmount = is this method really still used?
+
 
 #ifndef _FUSER_H_
 #define _FUSER_H_
@@ -55,13 +55,6 @@ extern "C" {
 // <- C#.Net Library ->
 
 
-
-// The current Fuser version (ver 0.6.0). Please set this constant on FuserOptions->Version.
-#define FUSER_VERSION		600 // TODO: Adjust values       <- C#.Net Library ->
-// TODO: Revise version system, which data type should be used, how are versions ordered?
-
-
-
 // TODO: Adjust name
 // <- C#.Net Library ->
 	#define FUSER_SUCCESS				 0
@@ -77,7 +70,7 @@ extern "C" {
 
 // TODO: Adapt name also in fuser.dll and FuserNet
 typedef struct _FUSER_OPTIONS {  // <- C#.Net Library ->
-	USHORT	Version; // Supported Fuser Version, ex. "530" (Fuser ver 0.5.3)
+	USHORT	Version; // Supported Fuser Version, ex. "530" (Fuser ver 0.5.3) // TODO: change anyway
 	USHORT	ThreadCount; // number of threads to be used
 	ULONG	Options;	 // combination of FUSER_OPTIONS_*
 	ULONG64	GlobalContext; // FileSystem can use this variable
@@ -108,6 +101,10 @@ typedef struct _FUSER_FILE_INFO {   // <- C#.Net Library ->
 //   return 1 if buffer is full, otherwise 0
 //   (currently never return 1)
 typedef int (WINAPI *PFillFindData) (PWIN32_FIND_DATAW, PFUSER_FILE_INFO);
+
+
+
+
 
 
 
@@ -312,48 +309,25 @@ typedef struct _FUSER_OPERATIONS { // <- C#.Net Library ->
 
 
 int FUSERAPI
-FuserMain(
+FuserDeviceMount(
 	PFUSER_OPTIONS	FuserOptions,
 	PFUSER_OPERATIONS FuserOperations);
 
 
-
-BOOL FUSERAPI
-FuserUnmount(
-	WCHAR	DriveLetter);	
-	
-ULONG FUSERAPI
-FuserVersion();
-
-
-ULONG FUSERAPI
-FuserDriverVersion();
+ULONG FUSERAPI FuserVersion();
 
 
 BOOL FUSERAPI
-FuserRemoveMountPoint(
+FuserDeviceUnmount(
 	LPCWSTR MountPoint);
 	
-
-	
-
-
-// FuserIsNameInExpression
-//   check whether Name can match Expression
-//   Expression can contain wildcard characters (? and *)
-BOOL FUSERAPI
-FuserIsNameInExpression(  // TODO: check if method can be removed, but then also remove export in fuser.def
-	LPCWSTR		Expression,		// matching pattern
-	LPCWSTR		Name,			// file name
-	BOOL		IgnoreCase);	
-
 
 
 
 // FuserResetTimeout
 //   extends the time out of the current IO operation in driver.
 // TODO: Check if method can be removed or implemented differently -> FuserKeepAlive , remove export in fuser.def too.
-BOOL FUSERAPI
+BOOL 
 FuserResetTimeout(
 	ULONG				Timeout,	// timeout in millisecond
 	PFUSER_FILE_INFO	FuserFileInfo);
@@ -363,16 +337,6 @@ FuserResetTimeout(
 BOOL FUSERAPI
 FuserSendHeartbeat(LPCWSTR MountPoint, LPCWSTR DeviceName);
 	
-
-// Get the handle to Access Token
-// This method needs be called in CreateFile, OpenDirectory or CreateDirectly callback.
-// The caller must call CloseHandle for the returned handle.
-HANDLE FUSERAPI
-FuserOpenRequestorToken(
-	PFUSER_FILE_INFO	FuserFileInfo);	
-	
-
-
 	
 	
 VOID DebugLogWrite(LPCWSTR z); // TODO: remove this

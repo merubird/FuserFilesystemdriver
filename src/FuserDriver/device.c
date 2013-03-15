@@ -23,6 +23,8 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <mountmgr.h>
 #include <ntddvol.h>
 
+#include "..\_general\version.h"
+
 
 
 VOID
@@ -353,7 +355,15 @@ DiskDeviceControl(
 
 
 
-
+ULONG GetBinaryVersion(){
+	FUSER_VERSION_SINGLE version;
+	
+	version.FullValue.Major = VER_MAJOR;
+	version.FullValue.Minor = VER_MINOR;
+	version.FullValue.Revision = VER_REVISION;
+	
+	return version.SingleValue;
+}
 
 
 NTSTATUS
@@ -388,9 +398,9 @@ GlobalDeviceControl(
 		}
 		break;
 
-	case IOCTL_TEST:
-		if (irpSp->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(ULONG)) {
-			*(ULONG*)Irp->AssociatedIrp.SystemBuffer = FUSER_DRIVER_VERSION;
+	case IOCTL_GET_VERSION:
+		if (irpSp->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(ULONG)) {			
+			*(ULONG*)Irp->AssociatedIrp.SystemBuffer = GetBinaryVersion();
 			Irp->IoStatus.Information = sizeof(ULONG);
 			status = STATUS_SUCCESS;
 			break;
@@ -510,7 +520,7 @@ FuserDispatchDeviceControl(
 			status = FuserResetPendingIrpTimeout(DeviceObject, Irp);
 			break;
 		case IOCTL_GET_ACCESS_TOKEN:
-			status = FuserGetAccessToken(DeviceObject, Irp);
+			status = FuserGetAccessToken(DeviceObject, Irp); // TODO: test for what, then perhaps remove
 			break;
 		default:
 			{

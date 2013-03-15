@@ -83,6 +83,8 @@ FuserDbgPrint(LPCSTR format, ...)
 		OutputDebugStringA(buffer);
 }
 
+
+
 static
 VOID
 FuserDbgPrintW(LPCWSTR format, ...)
@@ -129,8 +131,7 @@ typedef struct _FUSER_CONTROL {
 
 
 
-BOOL FUSERAPI
-FuserMountControl(PFUSER_CONTROL Control);
+BOOL FUSERAPI FuserAgentControl(PFUSER_CONTROL Control);
 
 
 BOOL FUSERAPI
@@ -143,23 +144,6 @@ FuserServiceInstall(
 BOOL FUSERAPI
 FuserServiceDelete(
 	LPCWSTR	ServiceName);
-
-
-
-
-BOOL FUSERAPI
-FuserNetworkProviderInstall(); // TODO: remove method
-
-
-
-BOOL FUSERAPI
-FuserNetworkProviderUninstall();	// TODO: remove method
-
-
-
-BOOL FUSERAPI
-FuserSetDebugMode(ULONG Mode);
-
 
 	
 

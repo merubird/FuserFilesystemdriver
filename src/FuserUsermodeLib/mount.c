@@ -30,7 +30,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 
-
+/* TODO: check if constates or other references need to be removed
 BOOL FUSERAPI
 FuserNetworkProviderInstall() // TODO: completely disclaim it, no networksupport offer
 {
@@ -69,7 +69,6 @@ FuserNetworkProviderInstall() // TODO: completely disclaim it, no networksupport
 	return TRUE;
 }
 
-
 BOOL FUSERAPI
 FuserNetworkProviderUninstall()
 {
@@ -103,13 +102,13 @@ FuserNetworkProviderUninstall()
 
 	return TRUE;
 }
-
+*/
 
 
 
 
 BOOL FUSERAPI
-FuserRemoveMountPoint(
+FuserDeviceUnmount(
 	LPCWSTR MountPoint)
 {
 
@@ -119,13 +118,13 @@ FuserRemoveMountPoint(
 	control.Type = FUSER_CONTROL_UNMOUNT;
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 
-	DbgPrintW(L"FuserRemoveMountPoint %ws\n", MountPoint);
-	result = FuserMountControl(&control);
+	DbgPrintW(L"FuserDeviceUnmount %ws\n", MountPoint);
+	result = FuserAgentControl(&control);
 	if (result) {
 		DbgPrint("FuserControl recieved DeviceName:%ws\n", control.DeviceName);
 		SendReleaseIRP(control.DeviceName);
 	} else {
-		DbgPrint("FuserRemoveMountPoint failed\n");
+		DbgPrint("FuserDeviceUnmount failed\n");
 	}
 	return result;
 }
@@ -133,9 +132,7 @@ FuserRemoveMountPoint(
 
 
 
-BOOL FUSERAPI
-FuserMountControl(PFUSER_CONTROL Control)
-{
+BOOL FUSERAPI FuserAgentControl(PFUSER_CONTROL Control) {
 	HANDLE pipe;
 	DWORD writtenBytes;
 	DWORD readBytes;
@@ -207,16 +204,6 @@ FuserMount(
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
 
-	return  FuserMountControl(&control);
-}
-
-
-BOOL FUSERAPI
-FuserUnmount(
-	WCHAR	DriveLetter)
-{
-	WCHAR mountPoint[] = L"M:\\";
-	mountPoint[0] = DriveLetter;
-	return FuserRemoveMountPoint(mountPoint);
+	return  FuserAgentControl(&control);
 }
 

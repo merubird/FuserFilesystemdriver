@@ -20,11 +20,12 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define _PUBLIC_H_
 
 
-#define FUSER_DRIVER_VERSION	  0x0000190   // TODO: change value
+#define FUSER_DRIVER_VERSION	  0x0000190   // TODO: replace with BinaryVersion
 
 #define EVENT_CONTEXT_MAX_SIZE    (1024*32)
 
-#define IOCTL_TEST                CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+// TODO: which of these are needed where: adjust order
+//#define IOCTL_TEST                CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED,   FILE_ANY_ACCESS) //freeID TODO:
 #define IOCTL_SET_DEBUG_MODE      CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED,   FILE_ANY_ACCESS)
 #define IOCTL_EVENT_WAIT          CTL_CODE(FILE_DEVICE_UNKNOWN, 0x802, METHOD_BUFFERED,   FILE_ANY_ACCESS)
 #define IOCTL_EVENT_INFO          CTL_CODE(FILE_DEVICE_UNKNOWN, 0x803, METHOD_BUFFERED,   FILE_ANY_ACCESS)
@@ -35,6 +36,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define IOCTL_SERVICE_WAIT        CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80A, METHOD_BUFFERED,   FILE_ANY_ACCESS)
 #define IOCTL_RESET_TIMEOUT       CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80B, METHOD_BUFFERED,   FILE_ANY_ACCESS)
 #define IOCTL_GET_ACCESS_TOKEN    CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80C, METHOD_BUFFERED,   FILE_ANY_ACCESS)
+#define IOCTL_GET_VERSION         CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80D, METHOD_BUFFERED,   FILE_ANY_ACCESS)
 
 
 // TOCO: change names, unify
@@ -67,6 +69,23 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define FUSER_NOCACHE					256
 
 // Context-Struct
+
+
+
+typedef struct _FUSER_VERSION {
+	UCHAR	Major;
+	UCHAR	Minor;
+	USHORT	Revision;	
+} FUSER_VERSION;
+
+typedef struct _FUSER_VERSION_SINGLE {	
+	union {
+		ULONG SingleValue;
+		FUSER_VERSION FullValue;
+	};	
+} FUSER_VERSION_SINGLE;
+
+
 
 typedef struct _CREATE_CONTEXT {
 	ULONG	FileAttributes;

@@ -65,7 +65,7 @@ namespace FuserNet{
                 this.FuserMountDevice = new FuserDevice(fsDevice, this.drive.Volumelabel, this.drive.Filesystem, this.drive.Serialnumber);
                 
                 this.FuserMountOptions = new FuserDefinition.FUSER_OPTIONS();
-                this.FuserMountOptions.Version = FuserDefinition.FUSER_VERSION;
+                this.FuserMountOptions.Version = 600; // TODO: no longer exists
                 this.FuserMountOptions.ThreadCount = 0; // TODO: Determine and adjust the correct value
                 this.FuserMountOptions.MountPoint = mountPoint;
 
@@ -94,7 +94,7 @@ namespace FuserNet{
             
             try {
                 int dllstatus = 0;
-                dllstatus = FuserLinkLibraryCall.FuserMain(this.FuserMountOptions, this.FuserMountDevice);
+                dllstatus = FuserLinkLibraryCall.DeviceMount(this.FuserMountOptions, this.FuserMountDevice);
 
                 switch (dllstatus) {
                     case FuserDefinition.FUSER_SUCCESS:              mountReturnCode = FuserMountFinishStatus.SUCCESS;                break;
@@ -136,12 +136,16 @@ namespace FuserNet{
                     return;                
             }
             try {
-                FuserLinkLibraryCall.FuserRemoveMountPoint(this.MountPoint);
+                FuserLinkLibraryCall.DeviceUnmount(this.MountPoint);
             } catch {
                 return;
             }
         }
 
+
+        public static string GetFuserVersion(){
+            return FuserLinkLibraryCall.FuserVersion();
+        }
 
     }
 

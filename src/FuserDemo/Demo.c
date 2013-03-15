@@ -61,7 +61,7 @@ static void DbgPrint(LPCWSTR format, ...)
 
 
 
-
+/*
 static void
 PrintUserName(PFUSER_FILE_INFO	FuserFileInfo)
 {
@@ -98,7 +98,7 @@ PrintUserName(PFUSER_FILE_INFO	FuserFileInfo)
 
 	DbgPrint(L"  AccountName: %s, DomainName: %s\n", accountName, domainName);
 }
-
+*/
 
 
 static void
@@ -131,7 +131,7 @@ MirrorCreateFile(
 
 	DbgPrint(L"CreateFile : %s\n", filePath);
 
-	PrintUserName(FuserFileInfo);
+	//PrintUserName(FuserFileInfo);
 
 	if (CreationDisposition == CREATE_NEW)
 		DbgPrint(L"\tCREATE_NEW\n");
@@ -1073,7 +1073,7 @@ wmain(ULONG argc, PWCHAR argv[])
 	g_UseStdErr = FALSE;
 
 	ZeroMemory(fuserOptions, sizeof(FUSER_OPTIONS));
-	fuserOptions->Version = FUSER_VERSION;
+	fuserOptions->Version = 600; // TODO: FUSER_VERSION;
 	fuserOptions->ThreadCount = 0; // use default
 
 	for (command = 1; command < argc; command++) {
@@ -1146,7 +1146,7 @@ wmain(ULONG argc, PWCHAR argv[])
 	fuserOperations->GetVolumeInformation = MirrorGetVolumeInformation;
 	fuserOperations->Unmount = MirrorUnmount;
 
-	status = FuserMain(fuserOptions, fuserOperations);
+	status = FuserDeviceMount(fuserOptions, fuserOperations);
 	switch (status) {
 	case FUSER_SUCCESS:
 		fprintf(stderr, "Success\n");

@@ -63,12 +63,7 @@ namespace FuserLowlevelDriver {
             public byte Nocache;
             public byte WriteToEndOfFile;
         }
-
-
-
-
-        public const int FUSER_VERSION = 600; // ver 0.6.0
-
+        
         // TODO: Check which one is needed for what and adjust DriveMounter.Mount() too.
         // -> change method DriveMounter.Mount()
         public const int FUSER_SUCCESS = 0;

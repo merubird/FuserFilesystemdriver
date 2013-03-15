@@ -22,13 +22,18 @@ VFT2_DRV_VERSIONED_PRINTER	File contains a versioned printer driver.
 */
 
 
-
 #include "_build.ver"
+#include "version.h"
+
+#define VER_STRHELPER(x) #x
+#define VER_STR(x) VER_STRHELPER(x)
+
+
 // ---------------------------------------------------------------------
 //                 V E R S I O N
 //
-#define VER_FILEVERSION              0,00,00,0000
-#define VER_FILEVERSION_STR         "PRE RELEASE [E] 0,00,00,0000"
+#define VER_FILEVERSION              VER_MAJOR,VER_MINOR,VER_REVISION
+#define VER_FILEVERSION_STR          VER_STR(VER_MAJOR) "." VER_STR(VER_MINOR) "." VER_STR(VER_REVISION)
 
 // ---------------------------------------------------------------------
 

@@ -3,66 +3,57 @@ using System.Runtime.InteropServices;
 
 namespace FuserLowlevelDriver {
 
-    internal static class FuserLinkLibraryCall {        
+    internal static class FuserLinkLibraryCall {
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct VersionUnion {
+            [FieldOffset(0)] public uint BinaryVersion;
+            [FieldOffset(0)] public byte Major;
+            [FieldOffset(1)] public byte Minor;
+            [FieldOffset(2)] public ushort Revision;            
+        }
 
         private static class DLLCoreCall {
             [DllImport("fuser.dll")]
-            public static extern int FuserMain(ref FuserDefinition.FUSER_OPTIONS options, ref FuserDefinition.FUSER_OPERATIONS operations);
-
+            public static extern int FuserDeviceMount(ref FuserDefinition.FUSER_OPTIONS options, ref FuserDefinition.FUSER_OPERATIONS operations);
+            
             [DllImport("fuser.dll")]
-            public static extern int FuserUnmount(int driveLetter);
-
-            [DllImport("fuser.dll")]
-            public static extern int FuserRemoveMountPoint(IntPtr mountPoint);
-
-            [DllImport("fuser.dll")]
-            public static extern uint FuserVersion();
-
-            [DllImport("fuser.dll")]
-            public static extern uint FuserDriveVersion();
-
-            [DllImport("fuser.dll")]
-            public static extern bool FuserResetTimeout(uint timeout, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+            public static extern int FuserDeviceUnmount(IntPtr mountPoint);
 
             [DllImport("fuser.dll")]
             public static extern bool FuserSendHeartbeat(IntPtr MountPoint, IntPtr DeviceName);
+                       
+
+            [DllImport("fuser.dll")]
+            public static extern uint FuserVersion();
         }
 
 
-        public static int FuserMain(FuserDefinition.FUSER_OPTIONS fuserOptions, FuserDevice device) {
+        public static int DeviceMount(FuserDefinition.FUSER_OPTIONS fuserOptions, FuserDevice device) {            
             FuserDefinition.FUSER_OPERATIONS cmd = device.FuserLinkedDelegates;
-            int ret = DLLCoreCall.FuserMain(ref fuserOptions, ref cmd);
+            int ret = DLLCoreCall.FuserDeviceMount(ref fuserOptions, ref cmd);
             device.HeartbeatStop();
             return ret;
         }
 
-        public static int FuserUnmount(char driveLetter) {
-            return DLLCoreCall.FuserUnmount(driveLetter);
+
+        public static int DeviceUnmount(string mountPoint) {
+            return DLLCoreCall.FuserDeviceUnmount(Marshal.StringToHGlobalUni(mountPoint));
         }
-
-        public static int FuserRemoveMountPoint(string mountPoint) {
-            return DLLCoreCall.FuserRemoveMountPoint(Marshal.StringToHGlobalUni(mountPoint));
-        }
-
-        public static uint FuserVersion() {
-            return DLLCoreCall.FuserVersion();
-        }
-
-        public static uint FuserDriverVersion() {
-            return DLLCoreCall.FuserDriveVersion();
-        }
-
-        //public static bool FuserResetTimeout(uint timeout, FuserFileHandler fileinfo) { // TODO: remove
-        //    FuserDefinition.FUSER_FILE_INFO rawFileInfo = new FuserDefinition.FUSER_FILE_INFO();
-        //    rawFileInfo.FuserContext = fileinfo.FuserContext;
-        //    return DLLCoreCall.FuserResetTimeout(timeout, ref rawFileInfo);
-        //}
-
-        public static bool FuserSendHeartbeat(string MountPoint, string DeviceName) {
+                  
+        public static bool SendHeartbeat(string MountPoint, string DeviceName) {
             return DLLCoreCall.FuserSendHeartbeat(Marshal.StringToHGlobalUni(MountPoint), Marshal.StringToHGlobalUni(DeviceName));            
         }
 
-
+        public static string FuserVersion() {
+            VersionUnion n = new VersionUnion();
+            n.BinaryVersion = DLLCoreCall.FuserVersion();
+            if (n.BinaryVersion == 0) {
+                return "";
+            } else {
+                return n.Major + "." + n.Minor + "." + n.Revision;
+            }
+        }
 
     }
 

@@ -3,16 +3,8 @@ LIBRARY	fuser
 
 EXPORTS
 
-FuserMain
-FuserUnmount
-FuserRemoveMountPoint
-FuserMountControl
-FuserVersion
-FuserDriverVersion
-FuserOpenRequestorToken
-FuserNetworkProviderInstall
-FuserNetworkProviderUninstall
-FuserSetDebugMode
-FuserIsNameInExpression
-FuserResetTimeout
+FuserDeviceMount
+FuserDeviceUnmount
+FuserAgentControl
 FuserSendHeartbeat
+FuserVersion

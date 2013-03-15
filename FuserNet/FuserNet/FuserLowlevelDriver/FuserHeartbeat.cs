@@ -23,7 +23,7 @@ namespace FuserLowlevelDriver {
         private void pvSendHeartbeat(){
             try {
                 while (true) {
-                    FuserLinkLibraryCall.FuserSendHeartbeat(this.MountPoint, this.DeviceName);
+                    FuserLinkLibraryCall.SendHeartbeat(this.MountPoint, this.DeviceName);
                     Thread.Sleep(2000);
                 }
             } catch {
