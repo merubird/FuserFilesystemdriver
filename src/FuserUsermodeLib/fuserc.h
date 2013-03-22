@@ -59,7 +59,7 @@ extern "C" {
 
 #define FUSER_KEEPALIVE_TIME	3000 // in miliseconds       // TODO: should be moved to .NET class
 
-
+// TODO: Remove both variables:
 // FuserOptions->DebugMode is ON?
 extern	BOOL	g_DebugMode;
 

@@ -380,6 +380,7 @@ GlobalDeviceControl(
 
 	switch (irpSp->Parameters.DeviceIoControl.IoControlCode) {
 	case IOCTL_EVENT_START:
+		//Methode FuserStart on FuserUsermodeLibrary
 		FDbgPrint("  IOCTL_EVENT_START\n");
 		status = FuserEventStart(DeviceObject, Irp);
 		break;

@@ -6,55 +6,46 @@ using ComTypes = System.Runtime.InteropServices.ComTypes;
 namespace FuserLowlevelDriver {
     internal static class FuserDefinition {
         
-        [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        public struct FUSER_OPERATIONS {
-            public FuserDevice.CreateFileDelegate CreateFile;
-            public FuserDevice.OpenDirectoryDelegate OpenDirectory;
-            public FuserDevice.CreateDirectoryDelegate CreateDirectory;
-            public FuserDevice.CleanupDelegate Cleanup;
-            public FuserDevice.CloseFileDelegate CloseFile;
-            public FuserDevice.ReadFileDelegate ReadFile;
-            public FuserDevice.WriteFileDelegate WriteFile;
-            public FuserDevice.FlushFileBuffersDelegate FlushFileBuffers;
-            public FuserDevice.GetFileInformationDelegate GetFileInformation;
-            public FuserDevice.FindFilesDelegate FindFiles;
-            public IntPtr FindFilesWithPattern;
-            public FuserDevice.SetFileAttributesDelegate SetFileAttributes;
-            public FuserDevice.SetFileTimeDelegate SetFileTime;
-            public FuserDevice.DeleteFileDelegate DeleteFile;
-            public FuserDevice.DeleteDirectoryDelegate DeleteDirectory;
-            public FuserDevice.MoveFileDelegate MoveFile;
-            public FuserDevice.SetEndOfFileDelegate SetEndOfFile;
-            public FuserDevice.SetAllocationSizeDelegate SetAllocationSize;
-            public FuserDevice.LockFileDelegate LockFile;
-            public FuserDevice.UnlockFileDelegate UnlockFile;
-            public FuserDevice.GetDiskFreeSpaceDelegate GetDiskFreeSpace;
-            public FuserDevice.GetVolumeInformationDelegate GetVolumeInformation;
-            public FuserDevice.MountDelegate Mount;
-            public FuserDevice.UnmountDelegate Unmount;
-            public FuserDevice.GetFileSecurityDelegate GetFileSecurity;
-            public FuserDevice.SetFileSecurityDelegate SetFileSecurity;            
+
+        public enum FUSER_EVENT : int {
+            FUSER_EVENT_MOUNT = 1,
+            FUSER_EVENT_UNMOUNT = 2,
+            FUSER_EVENT_GET_VOLUME_INFORMATION = 3,
+            FUSER_EVENT_GET_DISK_FREESPACE = 4,
+            FUSER_EVENT_CREATE_FILE = 5,
+            FUSER_EVENT_CREATE_DIRECTORY = 6,
+            FUSER_EVENT_OPEN_DIRECTORY = 7,
+            FUSER_EVENT_CLOSE_FILE = 8,
+            FUSER_EVENT_CLEANUP = 9,
+            FUSER_EVENT_READ_FILE = 10,
+            FUSER_EVENT_WRITE_FILE = 11,
+            FUSER_EVENT_FLUSH_FILEBUFFERS = 12,
+            FUSER_EVENT_FIND_FILES = 13,
+            FUSER_EVENT_FIND_FILES_WITH_PATTERN = 14,
+            FUSER_EVENT_GET_FILE_INFORMATION = 15,
+            FUSER_EVENT_SET_FILE_ATTRIBUTES = 16,
+            FUSER_EVENT_SET_FILE_TIME = 17,
+            FUSER_EVENT_SET_End_OF_FILE = 18,
+            FUSER_EVENT_SET_ALLOCATIONSIZE = 19,
+            FUSER_EVENT_LOCK_FILE = 20,
+            FUSER_EVENT_UNLOCK_FILE = 21,
+            FUSER_EVENT_DELETE_FILE = 22,
+            FUSER_EVENT_DELETE_DIRECTORY = 23,
+            FUSER_EVENT_MOVE_FILE = 24,
+            FUSER_EVENT_GET_FILESECURITY = 25,
+            FUSER_EVENT_SET_FILESECURITY = 26,
         }
 
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto, Pack = 4)]
-        public struct FUSER_OPTIONS {
-            public ushort Version;
-            public ushort ThreadCount; // number of threads to be used
-            public uint Options;
-            public ulong GlobalContext; // must not be used
-            [MarshalAs(UnmanagedType.LPWStr)]
-            public string MountPoint;
-        }
 
+ 
 
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct FUSER_FILE_INFO {
             // TODO: Completely revise with driver / check values if necessary / check in driver
             public ulong Context; // TODO: change datatype, long or int
-            public ulong FuserContext;
-            public IntPtr FuserOptions;
+            public ulong FuserContext;            
             public uint ProcessId;
             public byte IsDirectory;
             public byte DeleteOnClose;
@@ -64,25 +55,36 @@ namespace FuserLowlevelDriver {
             public byte WriteToEndOfFile;
         }
         
-        // TODO: Check which one is needed for what and adjust DriveMounter.Mount() too.
-        // -> change method DriveMounter.Mount()
-        public const int FUSER_SUCCESS = 0;
-        public const int FUSER_ERROR = -1; // General Error
-        public const int FUSER_DRIVE_LETTER_ERROR = -2; // Bad Drive letter
-        public const int FUSER_DRIVER_INSTALL_ERROR = -3; // Can't install driver
-        public const int FUSER_START_ERROR = -4; // Driver something wrong
-        public const int FUSER_MOUNT_ERROR = -5; // Can't assign drive letter
-        public const int FUSER_MOUNT_POINT_ERROR = -6; /* Mount point is invalid */
-
-        public const uint FUSER_OPTION_DEBUG = 1;
-        public const uint FUSER_OPTION_STDERR = 2;
-        public const uint FUSER_OPTION_ALT_STREAM = 4; // Alternate Data Streams -> File:Secondfile
-        public const uint FUSER_OPTION_KEEP_ALIVE = 8;
-        public const uint FUSER_OPTION_NETWORK = 16;
-        public const uint FUSER_OPTION_REMOVABLE = 32;
-        public const uint FUSER_OPTION_HEARTBEAT = 256;
+        
+        // -> change method FuserDriverMounter.pvStart()
+        public const int FUSER_DEVICEMOUNT_VERSION_ERROR         = -1; // Version incompatible with this version
+        public const int FUSER_DEVICEMOUNT_EVENT_LOAD_ERROR		 = -2; // Error while loading the events.
+        public const int FUSER_DEVICEMOUNT_BAD_MOUNT_POINT_ERROR = -3; // mountpoint invalid
+        public const int FUSER_DEVICEMOUNT_DRIVER_INSTALL_ERROR	 = -4; // driver not installed
+        public const int FUSER_DEVICEMOUNT_DRIVER_START_ERROR	 = -5; // driver not started (FuserStart-method)
+        public const int FUSER_DEVICEMOUNT_MOUNT_ERROR			 = -6; // device can't mount (FuserDeviceAgent)	
+        public const int FUSER_DEVICEMOUNT_SUCCESS				 =  0; // device successfully unmount
+                
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_DEBUG		=	1;   // ouput debug message
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_STDERR		=	2;   // ouput debug message to stderr
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_USEADS		=	4;	// use Alternate Data Streams (e.g. C:\TEMP\TEST.TXT:ADS.file)
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT 	=	8; 	//  use heartbeat-check for device alive-control
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE = 16;  //  DeviceType: Removable-Device	
 
 
+
+
+
+        
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto, Pack = 4)]
+        public struct FUSER_MOUNT_PARAMETER { // TODO:
+            public ushort Version;
+            [MarshalAs(UnmanagedType.LPWStr)] public string MountPoint;
+            public uint Flags;
+            public ushort ThreadsCount; // number of threads to be used
+            public FuserDevice.EventLoaderDelegate EventLoaderFunc;
+        }
+   
 
 
 

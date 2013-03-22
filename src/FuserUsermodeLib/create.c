@@ -48,8 +48,7 @@ DispatchCreate(
 	eventInfo->SerialNumber = EventContext->SerialNumber;
 
 	fileInfo.ProcessId = EventContext->ProcessId;
-	fileInfo.FuserOptions = FuserInstance->FuserOptions;
-
+	
 	// FUSER_OPEN_INFO is structure for a opened file
 	// this will be freed by Close
 	openInfo = malloc(sizeof(FUSER_OPEN_INFO));
@@ -99,13 +98,13 @@ DispatchCreate(
 		fileInfo.IsDirectory = TRUE;
 
 		if (disposition == FILE_CREATE || disposition == FILE_OPEN_IF) {
-			if (FuserInstance->FuserOperations->CreateDirectory) {
-				status = FuserInstance->FuserOperations->CreateDirectory(
+			if (FuserInstance->FuserEvents->CreateDirectory) {
+				status = FuserInstance->FuserEvents->CreateDirectory(
 							EventContext->Create.FileName, &fileInfo); // TODO: Pass on all parameters
 			}
 		} else if(disposition == FILE_OPEN) {
-			if (FuserInstance->FuserOperations->OpenDirectory) {
-				status = FuserInstance->FuserOperations->OpenDirectory(
+			if (FuserInstance->FuserEvents->OpenDirectory) {
+				status = FuserInstance->FuserEvents->OpenDirectory(
 							EventContext->Create.FileName, &fileInfo); // TODO: Pass on all parameters
 			}
 		} else {
@@ -139,8 +138,8 @@ DispatchCreate(
 				break;
 		}
 		
-		if(FuserInstance->FuserOperations->CreateFile) {
-			status = FuserInstance->FuserOperations->CreateFile(
+		if(FuserInstance->FuserEvents->CreateFile) {
+			status = FuserInstance->FuserEvents->CreateFile(
 									EventContext->Create.FileName,
 									EventContext->Create.DesiredAccess,
 									EventContext->Create.ShareAccess,

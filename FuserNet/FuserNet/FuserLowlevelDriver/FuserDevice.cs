@@ -17,50 +17,21 @@ namespace FuserLowlevelDriver {
         private uint serialnumber;
 
         private FuserNet.ACLProxy aclProxy = new FuserNet.ACLProxy(); // TODO: remove
+
+        private Stack<FuserEventHandler> FuserEventLoader;
+        private List<FuserEventHandler> FuserEvents; // to prevent garbage collector
            
         public FuserDevice(IFuserFilesystemDevice fsDevice, string Volumelabel, string Filesystem, uint Serialnumber) {
             this.fsDevice = fsDevice;
             this.heartbeat = null;
             this.hManager = new FuserHandlerManager();
+            this.FuserEventLoader = null;
+            this.FuserEvents = null;
 
             this.volumelabel = Volumelabel;
             this.filesystem = Filesystem;
             this.serialnumber = Serialnumber;                        
-        }
-      
-        public FuserDefinition.FUSER_OPERATIONS FuserLinkedDelegates{
-            get {
-                FuserDefinition.FUSER_OPERATIONS linkedDelegates = new FuserDefinition.FUSER_OPERATIONS();
-
-                linkedDelegates.CreateFile = this.CreateFile;
-                linkedDelegates.OpenDirectory = this.OpenDirectory;
-                linkedDelegates.CreateDirectory = this.CreateDirectory;
-                linkedDelegates.Cleanup = this.Cleanup;
-                linkedDelegates.CloseFile = this.CloseFile;
-                linkedDelegates.ReadFile = this.ReadFile;
-                linkedDelegates.WriteFile = this.WriteFile;
-                linkedDelegates.FlushFileBuffers = this.FlushFileBuffers;
-                linkedDelegates.GetFileInformation = this.GetFileInformation;
-                linkedDelegates.FindFiles = this.FindFiles;
-                linkedDelegates.SetFileAttributes = this.SetFileAttributes;
-                linkedDelegates.SetFileTime = this.SetFileTime;
-                linkedDelegates.DeleteFile = this.DeleteFile;
-                linkedDelegates.DeleteDirectory = this.DeleteDirectory;
-                linkedDelegates.MoveFile = this.MoveFile;
-                linkedDelegates.SetEndOfFile = this.SetEndOfFile;
-                linkedDelegates.SetAllocationSize = this.SetAllocationSize;
-                linkedDelegates.LockFile = this.LockFile;
-                linkedDelegates.UnlockFile = this.UnlockFile;
-                linkedDelegates.GetDiskFreeSpace = this.GetDiskFreeSpace;
-                linkedDelegates.GetVolumeInformation = this.GetVolumeInformation;
-                linkedDelegates.Mount = this.Mount;
-                linkedDelegates.Unmount = this.Unmount;
-                linkedDelegates.GetFileSecurity = this.GetFileSecurity;
-                linkedDelegates.SetFileSecurity = this.SetFileSecurity;
-
-                return linkedDelegates;
-            }
-        }
+        }     
 
         public void HeartbeatStop() {
             // This method is not always executed, (programme abort)
@@ -128,12 +99,55 @@ namespace FuserLowlevelDriver {
                 }
             }
         }
+       
 
 
+        public delegate int EventLoaderDelegate(uint counter, ref IntPtr DelegatePointer);
+        public          int EventLoader        (uint counter, ref IntPtr DelegatePointer){            
+            if (this.FuserEventLoader == null){
+                this.FuserEventLoader = new Stack<FuserEventHandler>();
+                this.FuserEvents = new List<FuserEventHandler>();
+                
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_MOUNT,                 (FuserDevice.MountDelegate)this.Mount));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_UNMOUNT,               (FuserDevice.UnmountDelegate)this.Unmount));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_GET_VOLUME_INFORMATION,(FuserDevice.GetVolumeInformationDelegate)this.GetVolumeInformation));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_GET_DISK_FREESPACE,    (FuserDevice.GetDiskFreeSpaceDelegate)this.GetDiskFreeSpace));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_CREATE_FILE,           (FuserDevice.CreateFileDelegate)this.CreateFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_CREATE_DIRECTORY,      (FuserDevice.CreateDirectoryDelegate)this.CreateDirectory));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_OPEN_DIRECTORY,        (FuserDevice.OpenDirectoryDelegate)this.OpenDirectory));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_CLOSE_FILE,            (FuserDevice.CloseFileDelegate)this.CloseFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_CLEANUP,               (FuserDevice.CleanupDelegate)this.Cleanup));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_READ_FILE,             (FuserDevice.ReadFileDelegate)this.ReadFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_WRITE_FILE,            (FuserDevice.WriteFileDelegate)this.WriteFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_FLUSH_FILEBUFFERS,     (FuserDevice.FlushFileBuffersDelegate)this.FlushFileBuffers));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_FIND_FILES,            (FuserDevice.FindFilesDelegate)this.FindFiles));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_GET_FILE_INFORMATION,  (FuserDevice.GetFileInformationDelegate)this.GetFileInformation));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_FILE_ATTRIBUTES,   (FuserDevice.SetFileAttributesDelegate)this.SetFileAttributes));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_FILE_TIME,         (FuserDevice.SetFileTimeDelegate)this.SetFileTime));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_End_OF_FILE,       (FuserDevice.SetEndOfFileDelegate)this.SetEndOfFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_ALLOCATIONSIZE,    (FuserDevice.SetAllocationSizeDelegate)this.SetAllocationSize));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_LOCK_FILE,             (FuserDevice.LockFileDelegate)this.LockFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_UNLOCK_FILE,           (FuserDevice.UnlockFileDelegate)this.UnlockFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_DELETE_FILE,           (FuserDevice.DeleteFileDelegate)this.DeleteFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_DELETE_DIRECTORY,      (FuserDevice.DeleteDirectoryDelegate)this.DeleteDirectory));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_MOVE_FILE,             (FuserDevice.MoveFileDelegate)this.MoveFile));
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_GET_FILESECURITY,      (FuserDevice.GetFileSecurityDelegate)this.GetFileSecurity)); // TODO: remove
+                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_FILESECURITY,      (FuserDevice.SetFileSecurityDelegate)this.SetFileSecurity)); // TODO: remove
+            }
+            
+            if (this.FuserEventLoader.Count > 0) {
+                //Get next Event
+                FuserEventHandler ev = this.FuserEventLoader.Pop();
+                this.FuserEvents.Add(ev); // prevent remove by garbage collector
+                DelegatePointer = ev.GetEventPointer();
+                return ev.GetEventID();
+            }            
+            return 0; // No more Events found
+        }
 
 
-        public delegate int CreateFileDelegate(IntPtr rawFilname, uint rawAccessMode, uint rawShare, uint rawCreationDisposition, uint rawFlagsAndAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int CreateFile        (IntPtr rawFilname, uint rawAccessMode, uint rawShare, uint rawCreationDisposition, uint rawFlagsAndAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int CreateFileDelegate(IntPtr rawFilname, uint rawAccessMode, uint rawShare, uint rawCreationDisposition, uint rawFlagsAndAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int CreateFile        (IntPtr rawFilname, uint rawAccessMode, uint rawShare, uint rawCreationDisposition, uint rawFlagsAndAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 FuserFileHandler hFile = this.hManager.RegisterFileHandler(GetFilename(rawFilname), ref rawHFile);
 
@@ -212,8 +226,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int OpenDirectoryDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int OpenDirectory        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int OpenDirectoryDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int OpenDirectory        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 Win32Returncode ret = this.fsDevice.OpenDirectory(this.hManager.RegisterFileHandler(GetFilename(rawFilename), ref rawHFile));
 
@@ -230,8 +244,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int CreateDirectoryDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int CreateDirectory        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int CreateDirectoryDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int CreateDirectory        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 Win32Returncode ret = this.fsDevice.CreateDirectory(this.hManager.RegisterFileHandler(GetFilename(rawFilename), ref rawHFile));
 
@@ -248,8 +262,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int CleanupDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int Cleanup        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int CleanupDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int Cleanup        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.Cleanup(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile)));
             } catch (Exception e) {
@@ -258,8 +272,8 @@ namespace FuserLowlevelDriver {
             }
         }
 
-        public delegate int CloseFileDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int CloseFile        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int CloseFileDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int CloseFile        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 Win32Returncode ret = this.fsDevice.CloseFile(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile));
                 this.hManager.RemoveFileHandler(ref rawHFile);
@@ -273,8 +287,8 @@ namespace FuserLowlevelDriver {
 
 
         
-        public delegate int ReadFileDelegate(IntPtr rawFilename, IntPtr rawBuffer, uint rawBufferLength, ref uint rawReadLength, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public int          ReadFile        (IntPtr rawFilename, IntPtr rawBuffer, uint rawBufferLength, ref uint rawReadLength, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int ReadFileDelegate(IntPtr rawFilename, IntPtr rawBuffer, uint rawBufferLength, ref uint rawReadLength, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public int           ReadFile        (IntPtr rawFilename, IntPtr rawBuffer, uint rawBufferLength, ref uint rawReadLength, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {               
                 byte[] buf = new byte[rawBufferLength];
 
@@ -293,8 +307,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int WriteFileDelegate(IntPtr rawFilename, IntPtr rawBuffer, uint rawNumberOfBytesToWrite, ref uint rawNumberOfBytesWritten, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int WriteFile        (IntPtr rawFilename, IntPtr rawBuffer, uint rawNumberOfBytesToWrite, ref uint rawNumberOfBytesWritten, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int WriteFileDelegate(IntPtr rawFilename, IntPtr rawBuffer, uint rawNumberOfBytesToWrite, ref uint rawNumberOfBytesWritten, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int WriteFile        (IntPtr rawFilename, IntPtr rawBuffer, uint rawNumberOfBytesToWrite, ref uint rawNumberOfBytesWritten, long rawOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 byte[] buf = new byte[rawNumberOfBytesToWrite];
                 Marshal.Copy(rawBuffer, buf, 0, (int)rawNumberOfBytesToWrite); // TODO: check if change from uint to int is possible for rawNumberOfBytesToWrite, then remove casting
@@ -313,8 +327,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int FlushFileBuffersDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int FlushFileBuffers        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int FlushFileBuffersDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int FlushFileBuffers        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.FlushFileBuffers(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile)));
             } catch (Exception e) {
@@ -324,8 +338,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int GetFileInformationDelegate(IntPtr rawFilename, ref FuserDefinition.BY_HANDLE_FILE_INFORMATION rawHandleFileInformation, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int GetFileInformation        (IntPtr rawFilename, ref FuserDefinition.BY_HANDLE_FILE_INFORMATION rawHandleFileInformation, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int GetFileInformationDelegate(IntPtr rawFilename, ref FuserDefinition.BY_HANDLE_FILE_INFORMATION rawHandleFileInformation, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int GetFileInformation        (IntPtr rawFilename, ref FuserDefinition.BY_HANDLE_FILE_INFORMATION rawHandleFileInformation, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {                
                 FuserFileInformation fi = new FuserFileInformation();
 
@@ -350,8 +364,8 @@ namespace FuserLowlevelDriver {
 
         
 
-        public delegate int FindFilesDelegate(IntPtr rawFilename, IntPtr FunctionFillFindData, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int FindFiles        (IntPtr rawFilename, IntPtr FunctionFillFindData, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int FindFilesDelegate(IntPtr rawFilename, IntPtr FunctionFillFindData, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int FindFiles        (IntPtr rawFilename, IntPtr FunctionFillFindData, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 FuserDefinition.BY_HANDLE_FILE_INFORMATION rawFI = new FuserDefinition.BY_HANDLE_FILE_INFORMATION();
 
@@ -389,8 +403,8 @@ namespace FuserLowlevelDriver {
 
 
 
-        public delegate int SetFileAttributesDelegate(IntPtr rawFilename, uint rawAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int SetFileAttributes        (IntPtr rawFilename, uint rawAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int SetFileAttributesDelegate(IntPtr rawFilename, uint rawAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int SetFileAttributes        (IntPtr rawFilename, uint rawAttributes, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {                
                 FileAttributes attr = (FileAttributes)rawAttributes;
                 return ConvReturnCodeToInt(this.fsDevice.SetFileAttributes(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), attr));
@@ -405,8 +419,8 @@ namespace FuserLowlevelDriver {
 
         
 
-        public delegate int SetFileTimeDelegate(IntPtr rawFilename, ref ComTypes.FILETIME rawCreationTime, ref ComTypes.FILETIME rawLastAccessTime, ref ComTypes.FILETIME rawLastWriteTime, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int SetFileTime        (IntPtr rawFilename, ref ComTypes.FILETIME rawCreationTime, ref ComTypes.FILETIME rawLastAccessTime, ref ComTypes.FILETIME rawLastWriteTime, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int SetFileTimeDelegate(IntPtr rawFilename, ref ComTypes.FILETIME rawCreationTime, ref ComTypes.FILETIME rawLastAccessTime, ref ComTypes.FILETIME rawLastWriteTime, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int SetFileTime        (IntPtr rawFilename, ref ComTypes.FILETIME rawCreationTime, ref ComTypes.FILETIME rawLastAccessTime, ref ComTypes.FILETIME rawLastWriteTime, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {                                                        
                 return ConvReturnCodeToInt(this.fsDevice.SetFileTime(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), ConvDateTimeFromRAW(rawCreationTime), ConvDateTimeFromRAW(rawLastAccessTime),  ConvDateTimeFromRAW(rawLastWriteTime)));
             } catch (Exception e) {
@@ -415,8 +429,8 @@ namespace FuserLowlevelDriver {
             }
         }
 
-        public delegate int DeleteFileDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int DeleteFile        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int DeleteFileDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int DeleteFile        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.DeleteFile(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile)));
 
@@ -426,8 +440,8 @@ namespace FuserLowlevelDriver {
             }
         }
 
-        public delegate int DeleteDirectoryDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int DeleteDirectory        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int DeleteDirectoryDelegate(IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int DeleteDirectory        (IntPtr rawFilename, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.DeleteDirectory(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile)));
             } catch (Exception e) {
@@ -437,8 +451,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int MoveFileDelegate(IntPtr rawFilename, IntPtr rawNewFilename, int rawReplaceIfExisting, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int MoveFile        (IntPtr rawFilename, IntPtr rawNewFilename, int rawReplaceIfExisting, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int MoveFileDelegate(IntPtr rawFilename, IntPtr rawNewFilename, int rawReplaceIfExisting, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int MoveFile        (IntPtr rawFilename, IntPtr rawNewFilename, int rawReplaceIfExisting, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {                
                 string newFilename = GetFilename(rawNewFilename);
                 Win32Returncode ret = this.fsDevice.MoveFile(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), newFilename, (rawReplaceIfExisting != 0));
@@ -452,8 +466,8 @@ namespace FuserLowlevelDriver {
 
 
 
-        public delegate int SetEndOfFileDelegate(IntPtr rawFilename, long rawByteOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int SetEndOfFile        (IntPtr rawFilename, long rawByteOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int SetEndOfFileDelegate(IntPtr rawFilename, long rawByteOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int SetEndOfFile        (IntPtr rawFilename, long rawByteOffset, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.SetEndOfFile(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), rawByteOffset));
             } catch (Exception e) {
@@ -463,8 +477,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int SetAllocationSizeDelegate(IntPtr rawFilename, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int SetAllocationSize        (IntPtr rawFilename, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int SetAllocationSizeDelegate(IntPtr rawFilename, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int SetAllocationSize        (IntPtr rawFilename, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.SetAllocationSize(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), rawLength));
             } catch (Exception e) {
@@ -474,8 +488,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int LockFileDelegate(IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int LockFile        (IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int LockFileDelegate(IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int LockFile        (IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.LockFile(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), rawByteOffset, rawLength));
             } catch (Exception e) {
@@ -485,8 +499,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int UnlockFileDelegate(IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int UnlockFile        (IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int UnlockFileDelegate(IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int UnlockFile        (IntPtr rawFilename, long rawByteOffset, long rawLength, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 return ConvReturnCodeToInt(this.fsDevice.UnlockFile(this.hManager.GetFileHandler(GetFilename(rawFilename), ref rawHFile), rawByteOffset, rawLength));
             } catch (Exception e) {
@@ -495,8 +509,8 @@ namespace FuserLowlevelDriver {
             }
         }
 
-        public delegate int GetDiskFreeSpaceDelegate(ref ulong rawFreeBytesAvailable, ref ulong rawTotalNumberOfBytes, ref ulong rawTotalNumberOfFreeBytes, ref FuserDefinition.FUSER_FILE_INFO rawHFile); // TODO: remove rawHFile
-        public          int GetDiskFreeSpace        (ref ulong rawFreeBytesAvailable, ref ulong rawTotalNumberOfBytes, ref ulong rawTotalNumberOfFreeBytes, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int GetDiskFreeSpaceDelegate(ref ulong rawFreeBytesAvailable, ref ulong rawTotalNumberOfBytes, ref ulong rawTotalNumberOfFreeBytes, ref FuserDefinition.FUSER_FILE_INFO rawHFile); // TODO: remove rawHFile
+        public           int GetDiskFreeSpace        (ref ulong rawFreeBytesAvailable, ref ulong rawTotalNumberOfBytes, ref ulong rawTotalNumberOfFreeBytes, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {                
                 return ConvReturnCodeToInt(this.fsDevice.GetDiskFreeSpace(ref rawFreeBytesAvailable, ref rawTotalNumberOfBytes, ref rawTotalNumberOfFreeBytes));
             } catch (Exception e) {
@@ -505,8 +519,8 @@ namespace FuserLowlevelDriver {
             }
         }
 
-        public delegate int GetVolumeInformationDelegate(IntPtr rawVolumenameBuffer, uint rawVolumenameSize, ref uint rawSerialnumber, ref uint rawMaximumComponentLength, ref uint rawFileSystemFlags, IntPtr rawFileSystemnameBuffer, uint rawFileSystemnameSize, ref FuserDefinition.FUSER_FILE_INFO rawHFile); // TODO: remove rawHFile
-        public          int GetVolumeInformation        (IntPtr rawVolumenameBuffer, uint rawVolumenameSize, ref uint rawSerialnumber, ref uint rawMaximumComponentLength, ref uint rawFileSystemFlags, IntPtr rawFileSystemnameBuffer, uint rawFileSystemnameSize, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int GetVolumeInformationDelegate(IntPtr rawVolumenameBuffer, uint rawVolumenameSize, ref uint rawSerialnumber, ref uint rawMaximumComponentLength, ref uint rawFileSystemFlags, IntPtr rawFileSystemnameBuffer, uint rawFileSystemnameSize, ref FuserDefinition.FUSER_FILE_INFO rawHFile); // TODO: remove rawHFile
+        public           int GetVolumeInformation        (IntPtr rawVolumenameBuffer, uint rawVolumenameSize, ref uint rawSerialnumber, ref uint rawMaximumComponentLength, ref uint rawFileSystemFlags, IntPtr rawFileSystemnameBuffer, uint rawFileSystemnameSize, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 byte[] volumelabel = System.Text.Encoding.Unicode.GetBytes(this.volumelabel);
                 byte[] filesystem = System.Text.Encoding.Unicode.GetBytes(this.filesystem);
@@ -527,8 +541,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public delegate int MountDelegate(IntPtr rawMountPoint, IntPtr rawDeviceName);
-        public int          Mount        (IntPtr rawMountPoint, IntPtr rawDeviceName){
+        private delegate int MountDelegate(IntPtr rawMountPoint, IntPtr rawDeviceName);
+        public int           Mount        (IntPtr rawMountPoint, IntPtr rawDeviceName){            
             try {
                 if (this.heartbeat != null) {
                     return 0;
@@ -545,16 +559,17 @@ namespace FuserLowlevelDriver {
                 this.fsDevice.LogErrorMessage("Mount", e.Message);
                 return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
             }
+             
         }
 
 
-        public delegate int UnmountDelegate(ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int Unmount        (ref FuserDefinition.FUSER_FILE_INFO rawHFile){ // TODO: remove or change
+        private delegate int UnmountDelegate(ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int Unmount        (ref FuserDefinition.FUSER_FILE_INFO rawHFile){ // TODO: remove or change
             return 0;
         }
 
-        public delegate int GetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int GetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int GetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int GetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             try {
                 if (this.aclProxy != null) {
                     return this.aclProxy.GetFileSecurity(rawRequestedInformation, ref rawSecurityDescriptor, (int)rawSecurityDescriptorLength, ref rawSecurityDescriptorLengthNeeded);
@@ -566,10 +581,28 @@ namespace FuserLowlevelDriver {
             return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
         }
 
-        public delegate int SetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public          int SetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+        private delegate int SetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int SetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
             return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
         }
 
+    }
+
+
+    internal class FuserEventHandler { // TODO: find another location for this class
+        private int EventID;
+        private IntPtr EventPointer;
+        private Delegate EventDelegate;
+        public FuserEventHandler(FuserDefinition.FUSER_EVENT EventID, Delegate Event) {
+            this.EventID = (int) EventID;
+            this.EventDelegate = Event;
+            this.EventPointer = Marshal.GetFunctionPointerForDelegate(this.EventDelegate);
+        }
+        public int GetEventID() {
+            return this.EventID;
+        }
+        public IntPtr GetEventPointer() {
+            return this.EventPointer;
+        }
     }
 }

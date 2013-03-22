@@ -42,10 +42,10 @@ DispatchCleanup(
 
 	DbgPrint("###Cleanup %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
-	if (FuserInstance->FuserOperations->Cleanup) {
+	if (FuserInstance->FuserEvents->Cleanup) {
 		// ignore return value
 		// TODO: Adapt the structure of the cleanup so that no return value can be transferred
-		FuserInstance->FuserOperations->Cleanup(
+		FuserInstance->FuserEvents->Cleanup(
 			EventContext->Cleanup.FileName,
 			&fileInfo);
 	}

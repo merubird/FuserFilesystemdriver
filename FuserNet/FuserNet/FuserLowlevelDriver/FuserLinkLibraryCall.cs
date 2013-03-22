@@ -15,7 +15,7 @@ namespace FuserLowlevelDriver {
 
         private static class DLLCoreCall {
             [DllImport("fuser.dll")]
-            public static extern int FuserDeviceMount(ref FuserDefinition.FUSER_OPTIONS options, ref FuserDefinition.FUSER_OPERATIONS operations);
+            public static extern int FuserDeviceMount(ref FuserDefinition.FUSER_MOUNT_PARAMETER parameter);
             
             [DllImport("fuser.dll")]
             public static extern int FuserDeviceUnmount(IntPtr mountPoint);
@@ -29,9 +29,10 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public static int DeviceMount(FuserDefinition.FUSER_OPTIONS fuserOptions, FuserDevice device) {            
-            FuserDefinition.FUSER_OPERATIONS cmd = device.FuserLinkedDelegates;
-            int ret = DLLCoreCall.FuserDeviceMount(ref fuserOptions, ref cmd);
+        public static int DeviceMount(FuserDefinition.FUSER_MOUNT_PARAMETER parameter, FuserDevice device) {            
+            parameter.Version = 1;
+            parameter.EventLoaderFunc = device.EventLoader;
+            int ret = DLLCoreCall.FuserDeviceMount(ref parameter);
             device.HeartbeatStop();
             return ret;
         }
@@ -46,6 +47,7 @@ namespace FuserLowlevelDriver {
         }
 
         public static string FuserVersion() {
+            // TODO: add trycatch
             VersionUnion n = new VersionUnion();
             n.BinaryVersion = DLLCoreCall.FuserVersion();
             if (n.BinaryVersion == 0) {

@@ -75,8 +75,7 @@
   SetOutPath $PROGRAMFILES\FuserFilesystemDriver
       
     File ..\bin\${os}_x86\FuserDeviceAgent.exe
-    File ..\bin\${os}_x86\Demo.exe
-
+    
   SetOutPath $SYSDIR
 
     File ..\bin\${os}_x86\Fuser.dll
@@ -89,8 +88,7 @@
   SetOutPath $PROGRAMFILES64\FuserFilesystemDriver
   	
     File ..\bin\${os}_amd64\FuserDeviceAgent.exe
-    File ..\bin\${os}_amd64\Demo.exe	
-
+    
   ${DisableX64FSRedirection}
 
   SetOutPath $SYSDIR

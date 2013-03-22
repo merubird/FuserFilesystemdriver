@@ -45,9 +45,9 @@ DispatchLock(
 
 	switch (EventContext->MinorFunction) {
 	case IRP_MN_LOCK:
-		if (FuserInstance->FuserOperations->LockFile) {
+		if (FuserInstance->FuserEvents->LockFile) {
 
-			status = FuserInstance->FuserOperations->LockFile(
+			status = FuserInstance->FuserEvents->LockFile(
 						EventContext->Lock.FileName,
 						EventContext->Lock.ByteOffset.QuadPart,
 						EventContext->Lock.Length.QuadPart,
@@ -63,9 +63,9 @@ DispatchLock(
 	case IRP_MN_UNLOCK_ALL_BY_KEY:
 		break;
 	case IRP_MN_UNLOCK_SINGLE:
-		if (FuserInstance->FuserOperations->UnlockFile) {
+		if (FuserInstance->FuserEvents->UnlockFile) {
 		
-			status = FuserInstance->FuserOperations->UnlockFile(
+			status = FuserInstance->FuserEvents->UnlockFile(
 						EventContext->Lock.FileName,
 						EventContext->Lock.ByteOffset.QuadPart,
 						EventContext->Lock.Length.QuadPart,

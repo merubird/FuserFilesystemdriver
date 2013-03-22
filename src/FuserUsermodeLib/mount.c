@@ -197,6 +197,7 @@ FuserMount(
 	ZeroMemory(&control, sizeof(FUSER_CONTROL));
 	control.Type = FUSER_CONTROL_MOUNT;
 	control.Option = 0;
+	// TODO: Add Version to control and check in fuserdeviceagent
 	if (UseHeartbeatControl){
 		control.Option = 1;
 	}

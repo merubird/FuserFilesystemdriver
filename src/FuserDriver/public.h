@@ -20,8 +20,6 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define _PUBLIC_H_
 
 
-#define FUSER_DRIVER_VERSION	  0x0000190   // TODO: replace with BinaryVersion
-
 #define EVENT_CONTEXT_MAX_SIZE    (1024*32)
 
 // TODO: which of these are needed where: adjust order
@@ -48,13 +46,13 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define FUSER_ALLOCATION_UNIT_SIZE	512 // used with fuser.dll, volume.c to calculate size
 
 
-// used in FUSER_START->DeviceType
-#define FUSER_DISK_FILE_SYSTEM		0
-#define FUSER_NETWORK_FILE_SYSTEM	1 // TODO: remove support
 
-#define FUSER_EVENT_ALTERNATIVE_STREAM_ON	1
-#define FUSER_EVENT_KEEP_ALIVE_ON			2
-#define FUSER_EVENT_REMOVABLE				4
+// used in FUSER_START->DeviceType
+#define FUSER_DISK_FILE_SYSTEM		0   // TODO: revise this
+#define FUSER_NETWORK_FILE_SYSTEM	1 // TODO: remove support
+#define FUSER_EVENT_ALTERNATIVE_STREAM_ON	1  // TODO: revise this
+#define FUSER_EVENT_KEEP_ALIVE_ON			2  // TODO: revise this
+#define FUSER_EVENT_REMOVABLE				4  // TODO: revise this
 
 
 
@@ -266,7 +264,7 @@ typedef struct _EVENT_INFORMATION {
 
 
 typedef struct _EVENT_DRIVER_INFO {
-	ULONG	DriverVersion;
+	ULONG	Version;
 	ULONG	Status;
 	ULONG	DeviceNumber;
 	ULONG	MountId;
@@ -274,10 +272,8 @@ typedef struct _EVENT_DRIVER_INFO {
 } EVENT_DRIVER_INFO, *PEVENT_DRIVER_INFO;
 
 typedef struct _EVENT_START {
-	ULONG	UserVersion;
-	ULONG	DeviceType;
-	ULONG	Flags;
-	WCHAR	DriveLetter;
+	ULONG	Version;	
+	ULONG	Flags;	
 } EVENT_START, *PEVENT_START;
 
 

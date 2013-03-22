@@ -411,7 +411,7 @@ FuserEventStart(
     __in PDEVICE_OBJECT DeviceObject,
     __in PIRP Irp
    )
-{
+{ // TODO: Revise:
 	ULONG				outBufferLen;
 	ULONG				inBufferLen;
 	PVOID				buffer;
@@ -432,7 +432,7 @@ FuserEventStart(
 	FDbgPrint("==> FuserEventStart\n");
 
 	fuserGlobal = DeviceObject->DeviceExtension;
-	if (GetIdentifierType(fuserGlobal) != DGL) {
+	if (GetIdentifierType(fuserGlobal) != DGL) { // TODO: DGL must be replaced with FGL or something else clever
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -449,8 +449,8 @@ FuserEventStart(
 	RtlCopyMemory(&eventStart, Irp->AssociatedIrp.SystemBuffer, sizeof(EVENT_START));
 	driverInfo = Irp->AssociatedIrp.SystemBuffer;
 
-	if (eventStart.UserVersion != FUSER_DRIVER_VERSION) {// TODO: Change with BinaryVersion
-		driverInfo->DriverVersion = FUSER_DRIVER_VERSION;
+	if (eventStart.Version != GetBinaryVersion() ) {
+		driverInfo->Version = GetBinaryVersion();
 		driverInfo->Status = FUSER_START_FAILED;
 		Irp->IoStatus.Status = STATUS_SUCCESS;
 		Irp->IoStatus.Information = sizeof(EVENT_DRIVER_INFO);
@@ -460,6 +460,7 @@ FuserEventStart(
 	deviceCharacteristics = FILE_DEVICE_IS_MOUNTED;
 
 	// TODO: cleanup the different name prefixes for parameters
+	/* TODO: remove network file system support
 	switch (eventStart.DeviceType) {
 	case FUSER_DISK_FILE_SYSTEM:
 		deviceType = FILE_DEVICE_DISK_FILE_SYSTEM;
@@ -472,6 +473,9 @@ FuserEventStart(
 		FDbgPrint("  Unknown device type: %d\n", eventStart.DeviceType);
 		deviceType = FILE_DEVICE_DISK_FILE_SYSTEM;
 	}
+	*/
+	deviceType = FILE_DEVICE_DISK_FILE_SYSTEM;
+	
 
 	if (eventStart.Flags & FUSER_EVENT_REMOVABLE) {
 		FDbgPrint("  DeviceCharacteristics |= FILE_REMOVABLE_MEDIA\n");
@@ -513,7 +517,7 @@ FuserEventStart(
 	driverInfo->DeviceNumber = fuserGlobal->MountId;
 	driverInfo->MountId = fuserGlobal->MountId;
 	driverInfo->Status = FUSER_MOUNTED;
-	driverInfo->DriverVersion = FUSER_DRIVER_VERSION;
+	driverInfo->Version = GetBinaryVersion();
 
 	// SymbolicName is \\DosDevices\\Global\\FuserDevice{b9892757-6a70-4e51-9eaf-9ef1e093b0e8}
 	// Finds the last '\' and copy into DeviceName.

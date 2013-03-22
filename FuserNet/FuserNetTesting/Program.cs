@@ -49,6 +49,9 @@ namespace Testsystem
             Console.WriteLine("--------  Start Fuser Drive -------");
             Console.WriteLine("Version : " + FuserDriveMounter.GetFuserVersion());
             Console.WriteLine("Start: " + vdm.Mount(mountPoint));
+                       
+
+
 
             string tmp = "-";
             while (tmp != "") {

@@ -46,17 +46,16 @@ typedef struct _FUSER_INSTANCE {
 	WCHAR	DeviceName[64];
 	WCHAR	MountPoint[MAX_PATH];
 
-	ULONG	DeviceNumber;
-	ULONG	MountId;
-
-	PFUSER_OPTIONS		FuserOptions;
-	PFUSER_OPERATIONS	FuserOperations;
+	ULONG	DeviceNumber; // TODO: clarify why and for what
+	ULONG	MountId; // TODO: clarify why and for what
+	
+	PFUSER_EVENT_CALLBACKS 	FuserEvents;
 	LIST_ENTRY	ListEntry;
 
 } FUSER_INSTANCE, *PFUSER_INSTANCE;
 
 
-typedef struct _FUSER_OPEN_INFO {
+typedef struct _FUSER_OPEN_INFO { // TODO: Revise
 	BOOL			IsDirectory;
 	ULONG			OpenCount;
 	PEVENT_CONTEXT	EventContext;
@@ -230,7 +229,7 @@ DispatchSetInformation(
 ULONG
 GetNTStatus(DWORD ErrorCode);	
 
-
+ULONG GetBinaryVersion();
 
 VOID
 DispatchFlush(

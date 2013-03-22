@@ -30,9 +30,9 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 int
 FuserSetAllocationInformation(
-	 PEVENT_CONTEXT		EventContext,
-	 PFUSER_FILE_INFO	FileInfo,
-	 PFUSER_OPERATIONS	FuserOperations)
+	 PEVENT_CONTEXT			EventContext,
+	 PFUSER_FILE_INFO		FileInfo,
+	 PFUSER_EVENT_CALLBACKS FuserEvents)
 {
 	PFILE_ALLOCATION_INFORMATION allocInfo =
 		(PFILE_ALLOCATION_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
@@ -43,15 +43,15 @@ FuserSetAllocationInformation(
 	// is less than the end-of-file position, the end-of-file position is automatically
 	// adjusted to match the allocation size.
 
-	if (FuserOperations->SetAllocationSize) {
-		return FuserOperations->SetAllocationSize(
+	if (FuserEvents->SetAllocationSize) {
+		return FuserEvents->SetAllocationSize(
 			EventContext->SetFile.FileName,
 			allocInfo->AllocationSize.QuadPart,
 			FileInfo);
 	}
 	// How can we check the current end-of-file position?
 	if (allocInfo->AllocationSize.QuadPart == 0) {
-		return FuserOperations->SetEndOfFile(
+		return FuserEvents->SetEndOfFile(
 			EventContext->SetFile.FileName,
 			allocInfo->AllocationSize.QuadPart,
 			FileInfo);
@@ -66,17 +66,17 @@ FuserSetAllocationInformation(
 
 int
 FuserSetEndOfFileInformation(
-	 PEVENT_CONTEXT		EventContext,
-	 PFUSER_FILE_INFO	FileInfo,
-	 PFUSER_OPERATIONS	FuserOperations)
+	 PEVENT_CONTEXT			EventContext,
+	 PFUSER_FILE_INFO		FileInfo,
+	 PFUSER_EVENT_CALLBACKS FuserEvents)
 {
 	PFILE_END_OF_FILE_INFORMATION endInfo =
 		(PFILE_END_OF_FILE_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
 
-	if (!FuserOperations->SetEndOfFile)
+	if (!FuserEvents->SetEndOfFile)
 		return -1;
 
-	return FuserOperations->SetEndOfFile(
+	return FuserEvents->SetEndOfFile(
 		EventContext->SetFile.FileName,
 		endInfo->EndOfFile.QuadPart,
 		FileInfo);
@@ -85,9 +85,9 @@ FuserSetEndOfFileInformation(
 
 int
 FuserSetBasicInformation(
-	 PEVENT_CONTEXT		EventContext,
-	 PFUSER_FILE_INFO	FileInfo,
-	 PFUSER_OPERATIONS	FuserOperations)
+	 PEVENT_CONTEXT			EventContext,
+	 PFUSER_FILE_INFO		FileInfo,
+	 PFUSER_EVENT_CALLBACKS FuserEvents)
 {
 	FILETIME creation, lastAccess, lastWrite;
 	int status = -1;
@@ -95,13 +95,13 @@ FuserSetBasicInformation(
 	PFILE_BASIC_INFORMATION basicInfo =
 		(PFILE_BASIC_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
 
-	if (!FuserOperations->SetFileAttributes)
+	if (!FuserEvents->SetFileAttributes)
 		return -1;
 	
-	if (!FuserOperations->SetFileTime)
+	if (!FuserEvents->SetFileTime)
 		return -1;
 
-	status = FuserOperations->SetFileAttributes(
+	status = FuserEvents->SetFileAttributes(
 		EventContext->SetFile.FileName,
 		basicInfo->FileAttributes,
 		FileInfo);
@@ -117,7 +117,7 @@ FuserSetBasicInformation(
 	lastWrite.dwHighDateTime = basicInfo->LastWriteTime.HighPart;
 
 
-	return FuserOperations->SetFileTime(
+	return FuserEvents->SetFileTime(
 		EventContext->SetFile.FileName,
 		&creation,
 		&lastAccess,
@@ -129,14 +129,14 @@ FuserSetBasicInformation(
 
 int
 FuserSetDispositionInformation(
-	 PEVENT_CONTEXT		EventContext,
-	 PFUSER_FILE_INFO	FileInfo,
-	 PFUSER_OPERATIONS	FuserOperations)
+	 PEVENT_CONTEXT			EventContext,
+	 PFUSER_FILE_INFO		FileInfo,
+	 PFUSER_EVENT_CALLBACKS FuserEvents)
 {
 	PFILE_DISPOSITION_INFORMATION dispositionInfo =
 		(PFILE_DISPOSITION_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
 
-	if (!FuserOperations->DeleteFile || !FuserOperations->DeleteDirectory)
+	if (!FuserEvents->DeleteFile || !FuserEvents->DeleteDirectory)
 		return -1;
 
 	if (!dispositionInfo->DeleteFile) {
@@ -144,11 +144,11 @@ FuserSetDispositionInformation(
 	}
 
 	if (FileInfo->IsDirectory) {
-		return FuserOperations->DeleteDirectory(
+		return FuserEvents->DeleteDirectory(
 			EventContext->SetFile.FileName,
 			FileInfo);
 	} else {
-		return FuserOperations->DeleteFile(
+		return FuserEvents->DeleteFile(
 			EventContext->SetFile.FileName,
 			FileInfo);
 	}
@@ -160,10 +160,10 @@ FuserSetDispositionInformation(
 
 int
 FuserSetLinkInformation(
-	PEVENT_CONTEXT		EventContext,
-	PFUSER_FILE_INFO	FileInfo,
-	PFUSER_OPERATIONS	FuserOperations)
-{
+	PEVENT_CONTEXT			EventContext,
+	PFUSER_FILE_INFO		FileInfo,
+	PFUSER_EVENT_CALLBACKS	FuserEvents)
+{// TODO: check method what does it do
 	PFUSER_LINK_INFORMATION linkInfo =
 		(PFUSER_LINK_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
 	return -1;
@@ -175,9 +175,9 @@ FuserSetLinkInformation(
 
 int
 FuserSetRenameInformation(
-PEVENT_CONTEXT		EventContext,
-	 PFUSER_FILE_INFO	FileInfo,
-	 PFUSER_OPERATIONS	FuserOperations)
+PEVENT_CONTEXT				EventContext,
+	 PFUSER_FILE_INFO		FileInfo,
+	 PFUSER_EVENT_CALLBACKS	FuserEvents)
 {
 	PFUSER_RENAME_INFORMATION renameInfo =
 		(PFUSER_RENAME_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
@@ -198,10 +198,10 @@ PEVENT_CONTEXT		EventContext,
 		RtlCopyMemory(newName, renameInfo->FileName, renameInfo->FileNameLength);
 	}
 
-	if (!FuserOperations->MoveFile)
+	if (!FuserEvents->MoveFile)
 		return -1;
 
-	return FuserOperations->MoveFile(
+	return FuserEvents->MoveFile(
 		EventContext->SetFile.FileName,
 		newName,
 		renameInfo->ReplaceIfExists,
@@ -212,17 +212,17 @@ PEVENT_CONTEXT		EventContext,
 
 int
 FuserSetValidDataLengthInformation(
-	PEVENT_CONTEXT		EventContext,
-	PFUSER_FILE_INFO	FileInfo,
-	PFUSER_OPERATIONS	FuserOperations)
+	PEVENT_CONTEXT			EventContext,
+	PFUSER_FILE_INFO		FileInfo,
+	PFUSER_EVENT_CALLBACKS	FuserEvents)
 {
 	PFILE_VALID_DATA_LENGTH_INFORMATION validInfo =
 		(PFILE_VALID_DATA_LENGTH_INFORMATION)((PCHAR)EventContext + EventContext->SetFile.BufferOffset);
 
-	if (!FuserOperations->SetEndOfFile)
+	if (!FuserEvents->SetEndOfFile)
 		return -1;
 
-	return FuserOperations->SetEndOfFile(
+	return FuserEvents->SetEndOfFile(
 		EventContext->SetFile.FileName,
 		validInfo->ValidDataLength.QuadPart,
 		FileInfo);
@@ -261,27 +261,27 @@ DispatchSetInformation(
 	switch (EventContext->SetFile.FileInformationClass) {
 	case FileAllocationInformation:
 		status = FuserSetAllocationInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileBasicInformation:
 		status = FuserSetBasicInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileDispositionInformation:
 		status = FuserSetDispositionInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileEndOfFileInformation:
 		status = FuserSetEndOfFileInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileLinkInformation:
 		status = FuserSetLinkInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FilePositionInformation:
@@ -292,12 +292,12 @@ DispatchSetInformation(
 
 	case FileRenameInformation:
 		status = FuserSetRenameInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileValidDataLengthInformation:
 		status = FuserSetValidDataLengthInformation(
-				EventContext, &fileInfo, FuserInstance->FuserOperations);
+				EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	}

@@ -44,38 +44,61 @@ extern "C" {
 #define FUSER_CALLBACK __stdcall
 
 
-// <- C#.Net Library ->
-	#define FUSER_OPTION_DEBUG		1   // ouput debug message
-	#define FUSER_OPTION_STDERR		2   // ouput debug message to stderr
-	#define FUSER_OPTION_ALT_STREAM	4   // use alternate stream
-	#define FUSER_OPTION_KEEP_ALIVE	8   // use auto unmount
-	#define FUSER_OPTION_NETWORK	16  // use network drive, you need to install Fuser network provider.
-	#define FUSER_OPTION_REMOVABLE	32  // use removable drive
-	#define FUSER_OPTION_HEARTBEAT	256 // use heartbeat control
-// <- C#.Net Library ->
 
 
-// TODO: Adjust name
+
+
+
 // <- C#.Net Library ->
-	#define FUSER_SUCCESS				 0
-	#define FUSER_ERROR					-1 /* General Error */
-	#define FUSER_DRIVE_LETTER_ERROR	-2 /* Bad Drive letter */
-	#define FUSER_DRIVER_INSTALL_ERROR	-3 /* Can't install driver */
-	#define FUSER_START_ERROR			-4 /* Driver something wrong */
-	#define FUSER_MOUNT_ERROR			-5 /* Can't assign a drive letter or mount point */
-	#define FUSER_MOUNT_POINT_ERROR		-6 /* Mount point is invalid */
+	#define FUSER_MOUNT_PARAMETER_FLAG_DEBUG			1   // ouput debug message
+	#define FUSER_MOUNT_PARAMETER_FLAG_STDERR			2   // ouput debug message to stderr
+	#define FUSER_MOUNT_PARAMETER_FLAG_USEADS			4	// use Alternativ Data Stream (e.g. C:\TEMP\TEST.TXT:ADS.file)
+	#define FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT 		8 	//  use heartbeat-check for device alive-control
+	#define FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE 	16  //  DeviceType: Removable-Device	
 // <- C#.Net Library ->
 
+// <- C#.Net Library ->
+	#define FUSER_DEVICEMOUNT_VERSION_ERROR			-1 // Version incompatible with this version
+	#define FUSER_DEVICEMOUNT_EVENT_LOAD_ERROR		-2 // Error while loading the events.
+	#define FUSER_DEVICEMOUNT_BAD_MOUNT_POINT_ERROR -3 // mountpoint invalid
+	#define FUSER_DEVICEMOUNT_DRIVER_INSTALL_ERROR	-4 // driver not installed
+	#define FUSER_DEVICEMOUNT_DRIVER_START_ERROR	-5 // driver not started (FuserStart-method)
+	#define FUSER_DEVICEMOUNT_MOUNT_ERROR			-6 // device can't mount (FuserDeviceAgent)	
+	#define FUSER_DEVICEMOUNT_SUCCESS				0 // device successfully unmount
+	// TODO: add different success reasons for mount
+// <- C#.Net Library ->
+
+// <- C#.Net Library ->
+	#define FUSER_EVENT_MOUNT					1
+	#define FUSER_EVENT_UNMOUNT					2
+	#define FUSER_EVENT_GET_VOLUME_INFORMATION	3
+	#define FUSER_EVENT_GET_DISK_FREESPACE		4
+	#define FUSER_EVENT_CREATE_FILE				5
+	#define FUSER_EVENT_CREATE_DIRECTORY		6
+	#define FUSER_EVENT_OPEN_DIRECTORY			7
+	#define FUSER_EVENT_CLOSE_FILE				8
+	#define FUSER_EVENT_CLEANUP					9
+	#define FUSER_EVENT_READ_FILE				10
+	#define FUSER_EVENT_WRITE_FILE				11
+	#define FUSER_EVENT_FLUSH_FILEBUFFERS		12
+	#define FUSER_EVENT_FIND_FILES				13
+	#define FUSER_EVENT_FIND_FILES_WITH_PATTERN	14
+	#define FUSER_EVENT_GET_FILE_INFORMATION	15
+	#define FUSER_EVENT_SET_FILE_ATTRIBUTES		16
+	#define FUSER_EVENT_SET_FILE_TIME			17
+	#define FUSER_EVENT_SET_End_OF_FILE			18
+	#define FUSER_EVENT_SET_ALLOCATIONSIZE		19
+	#define FUSER_EVENT_LOCK_FILE				20
+	#define FUSER_EVENT_UNLOCK_FILE				21
+	#define FUSER_EVENT_DELETE_FILE				22
+	#define FUSER_EVENT_DELETE_DIRECTORY		23
+	#define FUSER_EVENT_MOVE_FILE				24
+	#define FUSER_EVENT_GET_FILESECURITY		25
+	#define FUSER_EVENT_SET_FILESECURITY		26
+// <- C#.Net Library ->
 
 
-// TODO: Adapt name also in fuser.dll and FuserNet
-typedef struct _FUSER_OPTIONS {  // <- C#.Net Library ->
-	USHORT	Version; // Supported Fuser Version, ex. "530" (Fuser ver 0.5.3) // TODO: change anyway
-	USHORT	ThreadCount; // number of threads to be used
-	ULONG	Options;	 // combination of FUSER_OPTIONS_*
-	ULONG64	GlobalContext; // FileSystem can use this variable
-	LPCWSTR	MountPoint; //  mount point "M:\" (drive letter) or "C:\mount\fuser" (path in NTFS)
-} FUSER_OPTIONS, *PFUSER_OPTIONS;
+
 
 
 
@@ -83,8 +106,7 @@ typedef struct _FUSER_OPTIONS {  // <- C#.Net Library ->
 // TODO: Also revise function, what is really used
 typedef struct _FUSER_FILE_INFO {   // <- C#.Net Library ->
 	ULONG64	Context;      // FileSystem can use this variable
-	ULONG64	FuserContext; // Don't touch this
-	PFUSER_OPTIONS FuserOptions; // A pointer to FUSER_OPTIONS which was  passed to FuserMain.
+	ULONG64	FuserContext; // Don't touch this	
 	ULONG	ProcessId;    // process id for the thread that originally requested a given I/O operation
 	UCHAR	IsDirectory;  // requesting a directory file
 	UCHAR	DeleteOnClose; // Delete on when "cleanup" is called
@@ -104,15 +126,91 @@ typedef int (WINAPI *PFillFindData) (PWIN32_FIND_DATAW, PFUSER_FILE_INFO);
 
 
 
+// <- C#.Net Library ->
+	typedef struct _FUSER_EVENT { 		
+		union {
+			ULONG CallPointer;
+			int (FUSER_CALLBACK *Mount) 				(LPCWSTR, LPCWSTR );
+			int (FUSER_CALLBACK *Unmount) 				(PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *GetVolumeInformation)	(LPWSTR, DWORD,	LPDWORD, LPDWORD, LPDWORD, LPWSTR, DWORD, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *GetDiskFreeSpace) 		(PULONGLONG, PULONGLONG, PULONGLONG, PFUSER_FILE_INFO);	
+			int (FUSER_CALLBACK *CreateFile) 			(LPCWSTR, DWORD, DWORD, DWORD, DWORD, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *CreateDirectory) 		(LPCWSTR, PFUSER_FILE_INFO);			
+			int (FUSER_CALLBACK *OpenDirectory) 		(LPCWSTR, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *CloseFile) 			(LPCWSTR, PFUSER_FILE_INFO);			
+			int (FUSER_CALLBACK *Cleanup) 				(LPCWSTR, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *ReadFile) 				(LPCWSTR, LPVOID, DWORD, LPDWORD, LONGLONG, PFUSER_FILE_INFO);	
+			int (FUSER_CALLBACK *WriteFile) 			(LPCWSTR, LPCVOID, DWORD, LPDWORD, LONGLONG, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *FlushFileBuffers) 		(LPCWSTR, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *FindFiles) 			(LPCWSTR, PFillFindData, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *FindFilesWithPattern)	(LPCWSTR, LPCWSTR, PFillFindData, PFUSER_FILE_INFO);			
+			int (FUSER_CALLBACK *GetFileInformation) 	(LPCWSTR, LPBY_HANDLE_FILE_INFORMATION, PFUSER_FILE_INFO);			
+			int (FUSER_CALLBACK *SetFileAttributes) 	(LPCWSTR, DWORD, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *SetFileTime) 			(LPCWSTR, CONST FILETIME*, CONST FILETIME*, CONST FILETIME*, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *SetEndOfFile) 			(LPCWSTR, LONGLONG, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *SetAllocationSize) 	(LPCWSTR, LONGLONG, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *LockFile) 				(LPCWSTR, LONGLONG, LONGLONG, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *UnlockFile) 			(LPCWSTR, LONGLONG,	LONGLONG, PFUSER_FILE_INFO);		
+			int (FUSER_CALLBACK *DeleteFile) 			(LPCWSTR, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *DeleteDirectory) 		(LPCWSTR, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *MoveFile) 				(LPCWSTR, LPCWSTR, BOOL, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *GetFileSecurity)		(LPCWSTR, PSECURITY_INFORMATION, PSECURITY_DESCRIPTOR, ULONG, PULONG, PFUSER_FILE_INFO);
+			int (FUSER_CALLBACK *SetFileSecurity) 		(LPCWSTR, PSECURITY_INFORMATION, PSECURITY_DESCRIPTOR, ULONG, PFUSER_FILE_INFO);
+		};
+	} FUSER_EVENT, *PFUSER_EVENT;
+// <- C#.Net Library ->	
+
+
+// <- C#.Net Library ->
+typedef struct _FUSER_MOUNT_PARAMETER {
+	USHORT	StructVersion;	// used struct Version, currently: 1, each change of this structure must increase this value.	
+	LPCWSTR	MountPoint; 	//  mount point "V:\" (drive letter) or "C:\DATA\fuser" (path in NTFS)
+	ULONG	Flags;	 		// combination of FUSER_MOUNT_PARAMETER_*
+	USHORT	ThreadsCount; 	// number of threads to be used		
+	int (FUSER_CALLBACK *EventLoader) (ULONG, PFUSER_EVENT); //Callback methode for event loading, ULONG = counter, FUSER_EVENT = EventHandler , returnvalue = EventID
+} FUSER_MOUNT_PARAMETER, *PFUSER_MOUNT_PARAMETER;
+// <- C#.Net Library ->
 
 
 
 
-// TODO: Adapt name also in fuser.dll and FuserNet
-typedef struct _FUSER_OPERATIONS { // <- C#.Net Library ->
-	// When an error occurs, return negative value.
-	// Usually you should return GetLastError() * -1.
 
+typedef struct _FUSER_EVENT_CALLBACKS {
+	// TODO: Revise parameters and return values
+
+	int (FUSER_CALLBACK *Mount) (
+		LPCWSTR, // MountPoint
+		LPCWSTR  // DeviceName
+		);		
+
+	int (FUSER_CALLBACK *Unmount) (
+		PFUSER_FILE_INFO
+		);
+		
+	int (FUSER_CALLBACK *GetVolumeInformation) ( // see Win32 API GetVolumeInformation
+		LPWSTR, // VolumeNameBuffer
+		DWORD,	// VolumeNameSize in num of chars
+		LPDWORD,// VolumeSerialNumber
+		LPDWORD,// MaximumComponentLength in num of chars
+		LPDWORD,// FileSystemFlags
+		LPWSTR,	// FileSystemNameBuffer
+		DWORD,	// FileSystemNameSize in num of chars
+		PFUSER_FILE_INFO
+		);
+		
+	// Neither GetDiskFreeSpace nor GetVolumeInformation
+	// save the FuserFileContext->Context.
+	// Before these methods are called, CreateFile may not be called.
+	// (ditto CloseFile and Cleanup)
+
+	// see Win32 API GetDiskFreeSpaceEx
+	int (FUSER_CALLBACK *GetDiskFreeSpace) (
+		PULONGLONG, // FreeBytesAvailable
+		PULONGLONG, // TotalNumberOfBytes
+		PULONGLONG, // TotalNumberOfFreeBytes
+		PFUSER_FILE_INFO
+		);
+		
 
 	// CreateFile
 	//   If file is a directory, CreateFile (not OpenDirectory) may be called.
@@ -126,24 +224,28 @@ typedef struct _FUSER_OPERATIONS { // <- C#.Net Library ->
 		DWORD,        // ShareMode
 		DWORD,        // CreationDisposition
 		DWORD,        // FlagsAndAttributes
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
+	int (FUSER_CALLBACK *CreateDirectory) (
+		LPCWSTR,				// FileName
+		PFUSER_FILE_INFO
+		);			
+		
 	int (FUSER_CALLBACK *OpenDirectory) (
 		LPCWSTR,				// FileName
 		PFUSER_FILE_INFO);
 
-	int (FUSER_CALLBACK *CreateDirectory) (
-		LPCWSTR,				// FileName
-		PFUSER_FILE_INFO);
-
+	int (FUSER_CALLBACK *CloseFile) (
+		LPCWSTR,      // FileName
+		PFUSER_FILE_INFO
+		);
+		
 	// When FileInfo->DeleteOnClose is true, you must delete the file in Cleanup.
 	int (FUSER_CALLBACK *Cleanup) (
 		LPCWSTR,      // FileName
-		PFUSER_FILE_INFO);
-
-	int (FUSER_CALLBACK *CloseFile) (
-		LPCWSTR,      // FileName
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
 	int (FUSER_CALLBACK *ReadFile) (
 		LPCWSTR,  // FileName
@@ -151,56 +253,84 @@ typedef struct _FUSER_OPERATIONS { // <- C#.Net Library ->
 		DWORD,    // NumberOfBytesToRead
 		LPDWORD,  // NumberOfBytesRead
 		LONGLONG, // Offset
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 	
-
 	int (FUSER_CALLBACK *WriteFile) (
 		LPCWSTR,  // FileName
 		LPCVOID,  // Buffer
 		DWORD,    // NumberOfBytesToWrite
 		LPDWORD,  // NumberOfBytesWritten
 		LONGLONG, // Offset
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
 	int (FUSER_CALLBACK *FlushFileBuffers) (
 		LPCWSTR, // FileName
-		PFUSER_FILE_INFO);
-
-
-	int (FUSER_CALLBACK *GetFileInformation) (
-		LPCWSTR,          // FileName
-		LPBY_HANDLE_FILE_INFORMATION, // Buffer
-		PFUSER_FILE_INFO);
-	
-
+		PFUSER_FILE_INFO
+		);
+		
 	int (FUSER_CALLBACK *FindFiles) (
 		LPCWSTR,			// PathName
 		PFillFindData,		// call this function with PWIN32_FIND_DATAW
-		PFUSER_FILE_INFO);  //  (see PFillFindData definition)
+		PFUSER_FILE_INFO
+		);  //  (see PFillFindData definition)
 
 
-		// TODO: FindFilesWithPattern remove, as not used
+	// TODO: FindFilesWithPattern remove, as not used
 	// You should implement either FindFiles or FindFilesWithPattern
 	int (FUSER_CALLBACK *FindFilesWithPattern) (
 		LPCWSTR,			// PathName
 		LPCWSTR,			// SearchPattern
 		PFillFindData,		// call this function with PWIN32_FIND_DATAW
-		PFUSER_FILE_INFO);
-
-
+		PFUSER_FILE_INFO
+		);
+		
+	int (FUSER_CALLBACK *GetFileInformation) (
+		LPCWSTR,          // FileName
+		LPBY_HANDLE_FILE_INFORMATION, // Buffer
+		PFUSER_FILE_INFO
+		);
+	
 	int (FUSER_CALLBACK *SetFileAttributes) (
 		LPCWSTR, // FileName
 		DWORD,   // FileAttributes
-		PFUSER_FILE_INFO);
-
+		PFUSER_FILE_INFO
+		);
 
 	int (FUSER_CALLBACK *SetFileTime) (
 		LPCWSTR,		// FileName
 		CONST FILETIME*, // CreationTime
 		CONST FILETIME*, // LastAccessTime
 		CONST FILETIME*, // LastWriteTime
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
+		
+	int (FUSER_CALLBACK *SetEndOfFile) (
+		LPCWSTR,  // FileName
+		LONGLONG, // Length
+		PFUSER_FILE_INFO
+		);
+	
+	int (FUSER_CALLBACK *SetAllocationSize) (
+		LPCWSTR,  // FileName
+		LONGLONG, // Length
+		PFUSER_FILE_INFO
+		);
+	
+	int (FUSER_CALLBACK *LockFile) (
+		LPCWSTR, // FileName
+		LONGLONG, // ByteOffset
+		LONGLONG, // Length
+		PFUSER_FILE_INFO
+		);
 
+	int (FUSER_CALLBACK *UnlockFile) (
+		LPCWSTR, // FileName
+		LONGLONG,// ByteOffset
+		LONGLONG,// Length
+		PFUSER_FILE_INFO
+		);
 
 	// You should not delete file on DeleteFile or DeleteDirectory.
 	// When DeleteFile or DeleteDirectory, you must check whether
@@ -212,106 +342,48 @@ typedef struct _FUSER_OPERATIONS { // <- C#.Net Library ->
 	// file in Close.
 	int (FUSER_CALLBACK *DeleteFile) (
 		LPCWSTR, // FileName
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
 	int (FUSER_CALLBACK *DeleteDirectory) ( 
 		LPCWSTR, // FileName
-		PFUSER_FILE_INFO);
-
+		PFUSER_FILE_INFO
+		);
 
 	int (FUSER_CALLBACK *MoveFile) (
 		LPCWSTR, // ExistingFileName
 		LPCWSTR, // NewFileName
 		BOOL,	// ReplaceExisiting
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
-
-	int (FUSER_CALLBACK *SetEndOfFile) (
-		LPCWSTR,  // FileName
-		LONGLONG, // Length
-		PFUSER_FILE_INFO);
-
-
-	int (FUSER_CALLBACK *SetAllocationSize) (
-		LPCWSTR,  // FileName
-		LONGLONG, // Length
-		PFUSER_FILE_INFO);
-
-
-	int (FUSER_CALLBACK *LockFile) (
-		LPCWSTR, // FileName
-		LONGLONG, // ByteOffset
-		LONGLONG, // Length
-		PFUSER_FILE_INFO);
-
-
-	int (FUSER_CALLBACK *UnlockFile) (
-		LPCWSTR, // FileName
-		LONGLONG,// ByteOffset
-		LONGLONG,// Length
-		PFUSER_FILE_INFO);
-
-
-	// Neither GetDiskFreeSpace nor GetVolumeInformation
-	// save the FuserFileContext->Context.
-	// Before these methods are called, CreateFile may not be called.
-	// (ditto CloseFile and Cleanup)
-
-	// see Win32 API GetDiskFreeSpaceEx
-	int (FUSER_CALLBACK *GetDiskFreeSpace) (
-		PULONGLONG, // FreeBytesAvailable
-		PULONGLONG, // TotalNumberOfBytes
-		PULONGLONG, // TotalNumberOfFreeBytes
-		PFUSER_FILE_INFO);
-
-
-	// see Win32 API GetVolumeInformation
-	int (FUSER_CALLBACK *GetVolumeInformation) (
-		LPWSTR, // VolumeNameBuffer
-		DWORD,	// VolumeNameSize in num of chars
-		LPDWORD,// VolumeSerialNumber
-		LPDWORD,// MaximumComponentLength in num of chars
-		LPDWORD,// FileSystemFlags
-		LPWSTR,	// FileSystemNameBuffer
-		DWORD,	// FileSystemNameSize in num of chars
-		PFUSER_FILE_INFO);
-
-	int (FUSER_CALLBACK *Mount) (
-		LPCWSTR, // MountPoint
-		LPCWSTR  // DeviceName
-		);		
-
-	int (FUSER_CALLBACK *Unmount) (
-		PFUSER_FILE_INFO);
-		
-	
-
-
-	// Suported since 0.6.0. You must specify the version at FUSER_OPTIONS.Version.
 	int (FUSER_CALLBACK *GetFileSecurity) (
 		LPCWSTR, // FileName
 		PSECURITY_INFORMATION, // A pointer to SECURITY_INFORMATION value being requested
 		PSECURITY_DESCRIPTOR, // A pointer to SECURITY_DESCRIPTOR buffer to be filled
 		ULONG, // length of Security descriptor buffer
 		PULONG, // LengthNeeded
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
 	int (FUSER_CALLBACK *SetFileSecurity) (
 		LPCWSTR, // FileName
 		PSECURITY_INFORMATION,
 		PSECURITY_DESCRIPTOR, // SecurityDescriptor
 		ULONG, // SecurityDescriptor length
-		PFUSER_FILE_INFO);
+		PFUSER_FILE_INFO
+		);
 
-} FUSER_OPERATIONS, *PFUSER_OPERATIONS;
+} FUSER_EVENT_CALLBACKS, *PFUSER_EVENT_CALLBACKS;
 
 
 
 
-int FUSERAPI
-FuserDeviceMount(
-	PFUSER_OPTIONS	FuserOptions,
-	PFUSER_OPERATIONS FuserOperations);
+
+
+
+
+int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter);
 
 
 ULONG FUSERAPI FuserVersion();

@@ -1043,6 +1043,36 @@ MirrorUnmount(
 	return 0;
 }
 
+static int EventLoader (ULONG c, PFUSER_EVENT ev){
+	switch (c) {
+		case 0:		ev->CreateFile = MirrorCreateFile; 						return	FUSER_EVENT_CREATE_FILE;			break;
+		case 1:		ev->OpenDirectory = MirrorOpenDirectory;				return	FUSER_EVENT_OPEN_DIRECTORY;			break;
+		case 2:		ev->CreateDirectory = MirrorCreateDirectory;			return	FUSER_EVENT_CREATE_DIRECTORY;		break;
+		case 3:		ev->Cleanup = MirrorCleanup;							return	FUSER_EVENT_CLEANUP;				break;
+		case 4:		ev->CloseFile = MirrorCloseFile;						return	FUSER_EVENT_CLOSE_FILE;				break;
+		case 5:		ev->ReadFile = MirrorReadFile;							return	FUSER_EVENT_READ_FILE;				break;
+		case 6:		ev->WriteFile = MirrorWriteFile;						return	FUSER_EVENT_WRITE_FILE;				break;
+		case 7:		ev->FlushFileBuffers = MirrorFlushFileBuffers;			return	FUSER_EVENT_FLUSH_FILEBUFFERS;		break;
+		case 8:		ev->GetFileInformation = MirrorGetFileInformation;		return	FUSER_EVENT_GET_FILE_INFORMATION;	break;
+		case 9:		ev->FindFiles = MirrorFindFiles;						return	FUSER_EVENT_FIND_FILES;				break;
+		case 10:	ev->SetFileAttributes = MirrorSetFileAttributes;		return	FUSER_EVENT_SET_FILE_ATTRIBUTES;	break;
+		case 11:	ev->SetFileTime = MirrorSetFileTime;					return	FUSER_EVENT_SET_FILE_TIME;			break;
+		case 12:	ev->DeleteFile = MirrorDeleteFile;						return	FUSER_EVENT_DELETE_FILE;			break;
+		case 13:	ev->DeleteDirectory = MirrorDeleteDirectory;			return	FUSER_EVENT_DELETE_DIRECTORY;		break;
+		case 14:	ev->MoveFile = MirrorMoveFile;							return	FUSER_EVENT_MOVE_FILE;				break;
+		case 15:	ev->SetEndOfFile = MirrorSetEndOfFile;					return	FUSER_EVENT_SET_End_OF_FILE;		break;
+		case 16:	ev->SetAllocationSize = MirrorSetAllocationSize;		return	FUSER_EVENT_SET_ALLOCATIONSIZE;		break;
+		case 17:	ev->LockFile = MirrorLockFile;							return	FUSER_EVENT_LOCK_FILE;				break;
+		case 18:	ev->UnlockFile = MirrorUnlockFile;						return	FUSER_EVENT_UNLOCK_FILE;			break;
+		case 19:	ev->GetFileSecurity = MirrorGetFileSecurity;			return	FUSER_EVENT_GET_FILESECURITY;		break;
+		case 20:	ev->SetFileSecurity = MirrorSetFileSecurity;			return	FUSER_EVENT_SET_FILESECURITY;		break;
+		case 21:	ev->GetVolumeInformation = MirrorGetVolumeInformation;	return	FUSER_EVENT_GET_VOLUME_INFORMATION;	break;
+		case 22:	ev->Unmount = MirrorUnmount;							return	FUSER_EVENT_UNMOUNT;				break;
+		default:
+			return 0;
+	}
+}
+
 
 
 int __cdecl
@@ -1051,20 +1081,17 @@ wmain(ULONG argc, PWCHAR argv[])
 
 	int status;
 	ULONG command;
-	PFUSER_OPERATIONS fuserOperations =
-			(PFUSER_OPERATIONS)malloc(sizeof(FUSER_OPERATIONS));
-	PFUSER_OPTIONS fuserOptions =
-			(PFUSER_OPTIONS)malloc(sizeof(FUSER_OPTIONS));
+	
+	PFUSER_MOUNT_PARAMETER MountParameter = (PFUSER_MOUNT_PARAMETER)malloc(sizeof(FUSER_MOUNT_PARAMETER));		
 
 	if (argc < 5) {
 		// TODO: Change path/name
 		fprintf(stderr, "Demo.exe\n"
 			"  /r RootDirectory (ex. /r c:\\test)\n"
 			"  /l DriveLetter (ex. /l m)\n"
-			"  /t ThreadCount (ex. /t 5)\n"
+			"  /t ThreadsCount (ex. /t 5)\n"
 			"  /d (enable debug output)\n"
 			"  /s (use stderr for output)\n"
-			"  /n (use network drive)\n"
 			"  /m (use removable drive)\n");
 		return -1;
 	}
@@ -1072,9 +1099,9 @@ wmain(ULONG argc, PWCHAR argv[])
 	g_DebugMode = FALSE;
 	g_UseStdErr = FALSE;
 
-	ZeroMemory(fuserOptions, sizeof(FUSER_OPTIONS));
-	fuserOptions->Version = 600; // TODO: FUSER_VERSION;
-	fuserOptions->ThreadCount = 0; // use default
+	ZeroMemory(MountParameter, sizeof(FUSER_MOUNT_PARAMETER));
+	MountParameter->StructVersion = 1; //Version for mount_parameter-struct
+	MountParameter->ThreadsCount = 0; // use default
 
 	for (command = 1; command < argc; command++) {
 		switch (towlower(argv[command][1])) {		
@@ -1087,23 +1114,20 @@ wmain(ULONG argc, PWCHAR argv[])
 		case L'l':
 			command++;
 			wcscpy_s(MountPoint, sizeof(MountPoint)/sizeof(WCHAR), argv[command]);
-			fuserOptions->MountPoint = MountPoint;
+			MountParameter->MountPoint = MountPoint;
 			break;
 		case L't':
 			command++;
-			fuserOptions->ThreadCount = (USHORT)_wtoi(argv[command]);
+			MountParameter->ThreadsCount = (USHORT)_wtoi(argv[command]);
 			break;
 		case L'd':
 			g_DebugMode = TRUE;
 			break;
 		case L's':
 			g_UseStdErr = TRUE;
-			break;
-		case L'n':
-			fuserOptions->Options |= FUSER_OPTION_NETWORK;
-			break;
+			break;		
 		case L'm':
-			fuserOptions->Options |= FUSER_OPTION_REMOVABLE;
+			MountParameter->Flags |= FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE;
 			break;		
 		default:
 			fwprintf(stderr, L"unknown command: %s\n", argv[command]);
@@ -1112,69 +1136,43 @@ wmain(ULONG argc, PWCHAR argv[])
 	}
 
 	if (g_DebugMode) {
-		fuserOptions->Options |= FUSER_OPTION_DEBUG;
+		MountParameter->Flags |= FUSER_MOUNT_PARAMETER_FLAG_DEBUG;
 	}
 	if (g_UseStdErr) {
-		fuserOptions->Options |= FUSER_OPTION_STDERR;
+		MountParameter->Flags |= FUSER_MOUNT_PARAMETER_FLAG_STDERR;
 	}
+	
+	MountParameter->EventLoader = EventLoader;
 
-	fuserOptions->Options |= FUSER_OPTION_KEEP_ALIVE;
-	ZeroMemory(fuserOperations, sizeof(FUSER_OPERATIONS));
-	fuserOperations->CreateFile = MirrorCreateFile;
-	fuserOperations->OpenDirectory = MirrorOpenDirectory;
-	fuserOperations->CreateDirectory = MirrorCreateDirectory;		
-	fuserOperations->Cleanup = MirrorCleanup;
-	fuserOperations->CloseFile = MirrorCloseFile;	
-	fuserOperations->ReadFile = MirrorReadFile;
-	fuserOperations->WriteFile = MirrorWriteFile;
-	fuserOperations->FlushFileBuffers = MirrorFlushFileBuffers;	
-	fuserOperations->GetFileInformation = MirrorGetFileInformation;
-	fuserOperations->FindFiles = MirrorFindFiles;
-	fuserOperations->FindFilesWithPattern = NULL;
-	fuserOperations->SetFileAttributes = MirrorSetFileAttributes;
-	fuserOperations->SetFileTime = MirrorSetFileTime;		
-	fuserOperations->DeleteFile = MirrorDeleteFile;
-	fuserOperations->DeleteDirectory = MirrorDeleteDirectory;
-	fuserOperations->MoveFile = MirrorMoveFile;	
-	fuserOperations->SetEndOfFile = MirrorSetEndOfFile;
-	fuserOperations->SetAllocationSize = MirrorSetAllocationSize;		
-	fuserOperations->LockFile = MirrorLockFile;
-	fuserOperations->UnlockFile = MirrorUnlockFile;
-	fuserOperations->GetFileSecurity = MirrorGetFileSecurity;
-	fuserOperations->SetFileSecurity = MirrorSetFileSecurity;
-	fuserOperations->GetDiskFreeSpace = NULL;
-	fuserOperations->GetVolumeInformation = MirrorGetVolumeInformation;
-	fuserOperations->Unmount = MirrorUnmount;
-
-	status = FuserDeviceMount(fuserOptions, fuserOperations);
+	status = FuserDeviceMount(MountParameter);
 	switch (status) {
-	case FUSER_SUCCESS:
+	case FUSER_DEVICEMOUNT_SUCCESS:
 		fprintf(stderr, "Success\n");
 		break;
-	case FUSER_ERROR:
-		fprintf(stderr, "Error\n");
+	case FUSER_DEVICEMOUNT_VERSION_ERROR:
+		fprintf(stderr, "Version viaolation\n");
 		break;
-	case FUSER_DRIVE_LETTER_ERROR:
-		fprintf(stderr, "Bad Drive letter\n");
+	case FUSER_DEVICEMOUNT_EVENT_LOAD_ERROR:
+		fprintf(stderr, "Error while loading the events\n");
 		break;
-	case FUSER_DRIVER_INSTALL_ERROR:
-		fprintf(stderr, "Can't install driver\n");
+	case FUSER_DEVICEMOUNT_BAD_MOUNT_POINT_ERROR:
+		fprintf(stderr, "Mountpoint invalid\n");
 		break;
-	case FUSER_START_ERROR:
-		fprintf(stderr, "Driver something wrong\n");
+	case FUSER_DEVICEMOUNT_DRIVER_INSTALL_ERROR:
+		fprintf(stderr, "driver not installed\n");
 		break;
-	case FUSER_MOUNT_ERROR:
-		fprintf(stderr, "Can't assign a drive letter\n");
+	case FUSER_DEVICEMOUNT_DRIVER_START_ERROR:
+		fprintf(stderr, "driver not started\n");
 		break;
-	case FUSER_MOUNT_POINT_ERROR:
-		fprintf(stderr, "Mount point error\n");
+	case FUSER_DEVICEMOUNT_MOUNT_ERROR:
+		fprintf(stderr, "device can't mount\n");
 		break;
 	default:
 		fprintf(stderr, "Unknown error: %d\n", status);
 		break;
-	}
+	}	
+	
 
-	free(fuserOptions);
-	free(fuserOperations);	
+	free(MountParameter);
 	return 0;
 }

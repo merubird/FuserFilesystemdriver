@@ -41,9 +41,8 @@ DispatchQuerySecurity(
 	
 
 	// TODO: remove the stuff with the version
-	if (FUSER_SECURITY_SUPPORTED_VERSION <= FuserInstance->FuserOptions->Version &&
-		FuserInstance->FuserOperations->GetFileSecurity) {
-		status = FuserInstance->FuserOperations->GetFileSecurity(
+	if (FuserInstance->FuserEvents->GetFileSecurity) {
+		status = FuserInstance->FuserEvents->GetFileSecurity(
 					EventContext->Security.FileName,
 					&EventContext->Security.SecurityInformation,
 					&eventInfo->Buffer,
@@ -104,9 +103,8 @@ DispatchSetSecurity(
 	securityDescriptor = (PCHAR)EventContext + EventContext->SetSecurity.BufferOffset;
 
 	// TODO: remove the stuff with the version
-	if (FUSER_SECURITY_SUPPORTED_VERSION <= FuserInstance->FuserOptions->Version &&
-		FuserInstance->FuserOperations->SetFileSecurity) {
-		status = FuserInstance->FuserOperations->SetFileSecurity(
+	if (FuserInstance->FuserEvents->SetFileSecurity) {
+		status = FuserInstance->FuserEvents->SetFileSecurity(
 					EventContext->SetSecurity.FileName,
 					&EventContext->SetSecurity.SecurityInformation,
 					securityDescriptor,

@@ -32,6 +32,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "fuseri.h"
 #include "list.h"
 
+// TODO: Remove both variables
 // FuserOptions->DebugMode is ON?
 BOOL	g_DebugMode = TRUE;
 
@@ -47,7 +48,7 @@ DWORD WINAPI
 FuserLoop(
    PFUSER_INSTANCE FuserInstance
 	)
-{
+{ // TODO: revise, proper event processing
 	HANDLE	device;
 	char	buffer[EVENT_CONTEXT_MAX_SIZE];
 	ULONG	count = 0;
@@ -329,8 +330,7 @@ SendToDevice(
 
     if (device == INVALID_HANDLE_VALUE) {
 		DWORD dwErrorCode = GetLastError();
-		DbgPrint("Fuser Error: Failed to open %ws with code %d\n",
-			DeviceName, dwErrorCode);
+		DbgPrint("Fuser Error: Failed to open %ws with code %d\n", DeviceName, dwErrorCode);
         return FALSE;
     }
 
@@ -356,48 +356,43 @@ SendToDevice(
 }
 
 
-BOOL
-IsValidDriveLetter(WCHAR DriveLetter)
-{
-	return (L'd' <= DriveLetter && DriveLetter <= L'z') ||
-		(L'D' <= DriveLetter && DriveLetter <= L'Z');
-}
-
-
-
-int
-CheckMountPoint(LPCWSTR	MountPoint)
-{
+BOOL CheckMountPoint(LPCWSTR MountPoint) {
 	ULONG	length = wcslen(MountPoint);
+	
+	//MountPoint always starts with "?:\"	
+	if (length < 3)
+		return FALSE;
 
-	if ((length == 1) ||
-		(length == 2 && MountPoint[1] == L':') ||
-		(length == 3 && MountPoint[1] == L':' && MountPoint[2] == L'\\')) {
-		WCHAR driveLetter = MountPoint[0];
-		
-		if (IsValidDriveLetter(driveLetter)) {
-			return FUSER_SUCCESS;
-		} else {
-			FuserDbgPrintW(L"Fuser Error: bad drive letter %s\n", MountPoint);
-			return FUSER_DRIVE_LETTER_ERROR;
-		}
-	} else if (length > 3) {
-		HANDLE handle = CreateFile(
-						MountPoint, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
-						FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+	if (MountPoint[1] != L':' || MountPoint[2] != L'\\' )
+		return FALSE;
+	
+	/* TODO: TODO: Accept lowercase, or convert
+	if (MountPoint[0] >= L'a' && MountPoint[0] <=L'z'){
+		//Driverletter lowercase, convert to uppercase:
+		MountPoint[0] = L'x';
+		//towlower   32
+	}
+	*/
+	
+	if (!(MountPoint[0] >= L'A' && MountPoint[0] <=L'Z')){
+		return FALSE;
+	}
+	
+	if (length > 3) {
+		HANDLE handle = CreateFile(MountPoint, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			FuserDbgPrintW(L"Fuser Error: bad mount point %s\n", MountPoint);
-			return FUSER_MOUNT_POINT_ERROR;
+			return FALSE;
 		}
 		CloseHandle(handle);
-		return FUSER_SUCCESS;
+		return TRUE;
 	}
-	return FUSER_MOUNT_POINT_ERROR;
+	return TRUE;
 }
 
 
 BOOL
-FuserStart(PFUSER_INSTANCE Instance)
+FuserStart(PFUSER_INSTANCE Instance, ULONG MountFlags)
 {
 	EVENT_START			eventStart;
 	EVENT_DRIVER_INFO	driverInfo;
@@ -406,17 +401,13 @@ FuserStart(PFUSER_INSTANCE Instance)
 	ZeroMemory(&eventStart, sizeof(EVENT_START));
 	ZeroMemory(&driverInfo, sizeof(EVENT_DRIVER_INFO));
 
-	eventStart.UserVersion = FUSER_DRIVER_VERSION;
-	if (Instance->FuserOptions->Options & FUSER_OPTION_ALT_STREAM) {
+	eventStart.Version = GetBinaryVersion();
+
+	eventStart.Flags |= FUSER_EVENT_KEEP_ALIVE_ON;
+	if (MountFlags & FUSER_MOUNT_PARAMETER_FLAG_USEADS) {
 		eventStart.Flags |= FUSER_EVENT_ALTERNATIVE_STREAM_ON;
-	}
-	if (Instance->FuserOptions->Options & FUSER_OPTION_KEEP_ALIVE) {
-		eventStart.Flags |= FUSER_EVENT_KEEP_ALIVE_ON;
-	}
-	if (Instance->FuserOptions->Options & FUSER_OPTION_NETWORK) {
-		eventStart.DeviceType = FUSER_NETWORK_FILE_SYSTEM;
-	}
-	if (Instance->FuserOptions->Options & FUSER_OPTION_REMOVABLE) {
+	}	
+	if (MountFlags & FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE) {
 		eventStart.Flags |= FUSER_EVENT_REMOVABLE;
 	}
 
@@ -430,10 +421,8 @@ FuserStart(PFUSER_INSTANCE Instance)
 		&returnedLength);
 
 	if (driverInfo.Status == FUSER_START_FAILED) {
-		if (driverInfo.DriverVersion != eventStart.UserVersion) {
-			FuserDbgPrint(
-				"Fuser Error: driver version mismatch, driver %X, dll %X\n",
-				driverInfo.DriverVersion, eventStart.UserVersion);
+		if (driverInfo.Version != eventStart.Version) {
+			FuserDbgPrint("Fuser Error: driver version mismatch, driver %X, dll %X\n",driverInfo.Version, eventStart.Version);
 		} else {
 			FuserDbgPrint("Fuser Error: driver start error\n");
 		}
@@ -451,60 +440,122 @@ FuserStart(PFUSER_INSTANCE Instance)
 }
 
 
+BOOL LoadEventHandler(PFUSER_MOUNT_PARAMETER MountParameter, PFUSER_EVENT_CALLBACKS FuserEvents){
+	ULONG			i;	
+	ULONG 			EventID;
+	PFUSER_EVENT	EventHandler = (PFUSER_EVENT)malloc(sizeof(FUSER_EVENT));	
+	
+	if (MountParameter->EventLoader != NULL){	
+		for (i = 0; i < 999999; ++i) {		
+			ZeroMemory(EventHandler, sizeof(FUSER_EVENT));
+			EventID = MountParameter->EventLoader(i,EventHandler);
+			
+			if (EventID == 0){
+				break;
+			} else {
+				if (EventHandler->CallPointer == 0){
+					free(EventHandler);
+					return FALSE;
+				} else {				
+					switch (EventID) {
+						case FUSER_EVENT_MOUNT:						FuserEvents->Mount = EventHandler->Mount;									break;
+						case FUSER_EVENT_UNMOUNT:					FuserEvents->Unmount = EventHandler->Unmount; 								break;
+						case FUSER_EVENT_GET_VOLUME_INFORMATION:	FuserEvents->GetVolumeInformation = EventHandler->GetVolumeInformation;		break;
+						case FUSER_EVENT_GET_DISK_FREESPACE: 		FuserEvents->GetDiskFreeSpace = EventHandler->GetDiskFreeSpace;				break;
+						case FUSER_EVENT_CREATE_FILE: 				FuserEvents->CreateFile = EventHandler->CreateFile;							break;
+						case FUSER_EVENT_CREATE_DIRECTORY: 			FuserEvents->CreateDirectory = EventHandler->CreateDirectory;				break;
+						case FUSER_EVENT_OPEN_DIRECTORY: 			FuserEvents->OpenDirectory = EventHandler->OpenDirectory;					break;
+						case FUSER_EVENT_CLOSE_FILE: 				FuserEvents->CloseFile = EventHandler->CloseFile;							break;
+						case FUSER_EVENT_CLEANUP: 					FuserEvents->Cleanup = EventHandler->Cleanup;								break;
+						case FUSER_EVENT_READ_FILE: 				FuserEvents->ReadFile = EventHandler->ReadFile;								break;
+						case FUSER_EVENT_WRITE_FILE: 				FuserEvents->WriteFile = EventHandler->WriteFile;							break;
+						case FUSER_EVENT_FLUSH_FILEBUFFERS: 		FuserEvents->FlushFileBuffers = EventHandler->FlushFileBuffers;				break;
+						case FUSER_EVENT_FIND_FILES: 				FuserEvents->FindFiles = EventHandler->FindFiles;							break;
+						case FUSER_EVENT_FIND_FILES_WITH_PATTERN: 	FuserEvents->FindFilesWithPattern = EventHandler->FindFilesWithPattern;		break;
+						case FUSER_EVENT_GET_FILE_INFORMATION:		FuserEvents->GetFileInformation = EventHandler->GetFileInformation;			break;
+						case FUSER_EVENT_SET_FILE_ATTRIBUTES: 		FuserEvents->SetFileAttributes = EventHandler->SetFileAttributes;			break;
+						case FUSER_EVENT_SET_FILE_TIME: 			FuserEvents->SetFileTime = EventHandler->SetFileTime;						break;
+						case FUSER_EVENT_SET_End_OF_FILE: 			FuserEvents->SetEndOfFile = EventHandler->SetEndOfFile;						break;
+						case FUSER_EVENT_SET_ALLOCATIONSIZE: 		FuserEvents->SetAllocationSize = EventHandler->SetAllocationSize;			break;
+						case FUSER_EVENT_LOCK_FILE: 				FuserEvents->LockFile = EventHandler->LockFile;								break;
+						case FUSER_EVENT_UNLOCK_FILE: 				FuserEvents->UnlockFile = EventHandler->UnlockFile;							break;
+						case FUSER_EVENT_DELETE_FILE: 				FuserEvents->DeleteFile = EventHandler->DeleteFile;							break;
+						case FUSER_EVENT_DELETE_DIRECTORY: 			FuserEvents->DeleteDirectory = EventHandler->DeleteDirectory;				break;
+						case FUSER_EVENT_MOVE_FILE: 				FuserEvents->MoveFile = EventHandler->MoveFile;								break;
+						case FUSER_EVENT_GET_FILESECURITY: 			FuserEvents->GetFileSecurity = EventHandler->GetFileSecurity;				break;
+						case FUSER_EVENT_SET_FILESECURITY: 			FuserEvents->SetFileSecurity = EventHandler->SetFileSecurity;				break;
 
-int FUSERAPI
-FuserDeviceMount(PFUSER_OPTIONS FuserOptions, PFUSER_OPERATIONS FuserOperations)
-{
-	ULONG	threadNum = 0;
-	ULONG	i;
-	BOOL	status;
-	int		error;
-	HANDLE	device;
-	HANDLE	threadIds[FUSER_MAX_THREAD];
-	ULONG   returnedLength;
-	char	buffer[1024];
-	BOOL	useMountPoint = FALSE;
-	PFUSER_INSTANCE instance;
+						default:	
+							free(EventHandler);						
+							return FALSE;
+					}
+				}
+			}
+		}
+		free(EventHandler);
+		return TRUE;
+	}
+	free(EventHandler);
+	return FALSE;
+}
 
-	g_DebugMode = FuserOptions->Options & FUSER_OPTION_DEBUG;
-	g_UseStdErr = FuserOptions->Options & FUSER_OPTION_STDERR;
+
+
+
+int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
+{	
+	ULONG					threadNum = 0;
+	ULONG					i;
+	HANDLE					device;
+	HANDLE					threadIds[FUSER_MAX_THREAD];	
+	PFUSER_INSTANCE 		instance;			
+	PFUSER_EVENT_CALLBACKS	FuserEvents;
+	
+	
+	if (MountParameter->StructVersion != 1){
+		//StructVersion incompatible, in future version must here implemetation of convert the struct
+		return FUSER_DEVICEMOUNT_VERSION_ERROR;
+	}
+	
+	FuserEvents  = (PFUSER_EVENT_CALLBACKS)malloc(sizeof(FUSER_EVENT_CALLBACKS));	 // TODO: use free
+	ZeroMemory(FuserEvents, sizeof(FUSER_EVENT_CALLBACKS));
+		
+	if (!LoadEventHandler(MountParameter, FuserEvents)){
+		free(FuserEvents);
+		return FUSER_DEVICEMOUNT_EVENT_LOAD_ERROR; 
+	}
+	
+	//  Events ready for use
+	
+
+	g_DebugMode = MountParameter->Flags & FUSER_MOUNT_PARAMETER_FLAG_DEBUG;
+	g_UseStdErr = MountParameter->Flags & FUSER_MOUNT_PARAMETER_FLAG_STDERR;
 
 	if (g_DebugMode) {
 		DbgPrintW(L"Fuser: debug mode on\n");
 	}
 
 	if (g_UseStdErr) {
-		DbgPrintW(L"Fuser: use stderr\n");
 		g_DebugMode = TRUE;
+		DbgPrintW(L"Fuser: debug mode on, output=stderr\n");		
 	}
 
+	if (MountParameter->ThreadsCount == 0) 
+		MountParameter->ThreadsCount = 5;
 
-	if (FuserOptions->ThreadCount == 0) {
-		FuserOptions->ThreadCount = 5;
-
-	} else if (FUSER_MAX_THREAD-1 < FuserOptions->ThreadCount) {
-		// FUSER_MAX_THREAD includes FuserKeepAlive thread, so 
-		// available thread is FUSER_MAX_THREAD -1
-		FuserDbgPrintW(L"Fuser Error: too many thread count %d\n",
-			FuserOptions->ThreadCount);
-		FuserOptions->ThreadCount = FUSER_MAX_THREAD-1;
+	if ( MountParameter->ThreadsCount > FUSER_MAX_THREAD-1) {
+		// FUSER_MAX_THREAD includes FuserKeepAlive-Thread, so available thread is FUSER_MAX_THREAD -1		
+		MountParameter->ThreadsCount = FUSER_MAX_THREAD-1;
+	}
+	
+	
+	if (!CheckMountPoint(MountParameter->MountPoint)){
+		free(FuserEvents);
+		return FUSER_DEVICEMOUNT_BAD_MOUNT_POINT_ERROR; 
 	}
 
-	// TODO: solve this workaround:
-	if (FUSER_MOUNT_POINT_SUPPORTED_VERSION <= FuserOptions->Version &&
-		FuserOptions->MountPoint) {
-		error = CheckMountPoint(FuserOptions->MountPoint);
-		if (error != FUSER_SUCCESS) {
-			return error;
-		}
-		useMountPoint = TRUE;
-	} else if (!IsValidDriveLetter((WCHAR)FuserOptions->Version)) {
-		// Older versions use the first 2 bytes of FuserOptions struct as DriveLetter.
-		FuserDbgPrintW(L"Fuser Error: bad drive letter %wc\n", (WCHAR)FuserOptions->Version);
-		return FUSER_DRIVE_LETTER_ERROR;
-	}
-
-
+	// Parameters set
+	
 	device = CreateFile(
 					FUSER_GLOBAL_DEVICE_NAME,			// lpFileName
 					GENERIC_READ|GENERIC_WRITE,			// dwDesiredAccess
@@ -516,80 +567,76 @@ FuserDeviceMount(PFUSER_OPTIONS FuserOptions, PFUSER_OPERATIONS FuserOperations)
                     );
 
 	if (device == INVALID_HANDLE_VALUE){
-		FuserDbgPrintW(L"Fuser Error: CreatFile Failed %s: %d\n", 
-			FUSER_GLOBAL_DEVICE_NAME, GetLastError());
-		return FUSER_DRIVER_INSTALL_ERROR;
-	}
-
-	DbgPrint("device opened\n");
-
-	instance = NewFuserInstance();
-
-	instance->FuserOptions = FuserOptions;
-	instance->FuserOperations = FuserOperations;
-	
-	// TODO: remove this workaround and solve it correctly
-	if (useMountPoint) {
-		wcscpy_s(instance->MountPoint, sizeof(instance->MountPoint) / sizeof(WCHAR),
-				FuserOptions->MountPoint);
-	} else {
-		// Older versions use the first 2 bytes of FuserOptions struct as DriveLetter.
-		instance->MountPoint[0] = (WCHAR)FuserOptions->Version;
-		instance->MountPoint[1] = L':';
-		instance->MountPoint[2] = L'\\';
-	}
-
-	if (!FuserStart(instance)) {
-		return FUSER_START_ERROR;
+		FuserDbgPrintW(L"Fuser Error: CreatFile Failed %s: %d\n", FUSER_GLOBAL_DEVICE_NAME, GetLastError());
+		free(FuserEvents);
+		return FUSER_DEVICEMOUNT_DRIVER_INSTALL_ERROR;
 	}
 	
-	if (!FuserMount(instance->MountPoint, instance->DeviceName,  FuserOptions->Options & FUSER_OPTION_HEARTBEAT  )) {
-		SendReleaseIRP(instance->DeviceName);
-		FuserDbgPrint("Fuser Error: DefineDosDevice Failed\n");
-		return FUSER_MOUNT_ERROR;
+	// create an instance and fill the values:	
+	instance = NewFuserInstance();	
+	instance->FuserEvents = FuserEvents;	
+	wcscpy_s(instance->MountPoint, sizeof(instance->MountPoint) / sizeof(WCHAR), MountParameter->MountPoint);
+	
+
+	if (!FuserStart(instance, MountParameter->Flags)) { //This method creates the device for the new drive
+		free(FuserEvents);
+		return FUSER_DEVICEMOUNT_DRIVER_START_ERROR;
 	}
 		
-	if (FuserOperations->Mount) {
-		FuserOperations->Mount(instance->MountPoint, instance->DeviceName);
+	if (!FuserMount(instance->MountPoint, instance->DeviceName,  MountParameter->Flags & FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT  )) {
+		SendReleaseIRP(instance->DeviceName);
+		FuserDbgPrint("Fuser Error: DefineDosDevice Failed\n");
+		free(FuserEvents);
+		return FUSER_DEVICEMOUNT_MOUNT_ERROR;
 	}
-	
+				
+	if (FuserEvents->Mount) {
+		FuserEvents->Mount(instance->MountPoint, instance->DeviceName);
+	}
+		
 	DbgPrintW(L"mounted: %s -> %s\n", instance->MountPoint, instance->DeviceName);
-
-	if (FuserOptions->Options & FUSER_OPTION_KEEP_ALIVE) {
-		threadIds[threadNum++] = (HANDLE)_beginthreadex(
-			NULL, // Security Atributes
-			0, //stack size
-			FuserKeepAlive,
-			instance, // param
-			0, // create flag
-			NULL);
-	}
-
-	for (i = 0; i < FuserOptions->ThreadCount; ++i) {
+	
+	//Device created and mounted
+	
+	
+	// starting keep-alive-thread:
+	threadIds[threadNum++] = (HANDLE)_beginthreadex(
+		NULL, // Security Atributes
+		0, //stack size
+		FuserKeepAlive,
+		instance, // param
+		0, // create flag
+		NULL
+	);
+	
+	
+	for (i = 0; i < MountParameter->ThreadsCount; ++i) {
 		threadIds[threadNum++] = (HANDLE)_beginthreadex(
 			NULL, // Security Atributes
 			0, //stack size
 			FuserLoop,
 			(PVOID)instance, // param
 			0, // create flag
-			NULL);
+			NULL
+		);
 	}
+	
+	// Device up and running...
 
 
 	// wait for thread terminations
 	WaitForMultipleObjects(threadNum, threadIds, TRUE, INFINITE);
-
 	for (i = 0; i < threadNum; ++i) {
 		CloseHandle(threadIds[i]);
 	}
 
     CloseHandle(device);
 
-	Sleep(1000);
-	
-	DbgPrint("\nunload\n");
+	//Sleep(1000); TODO: If there is a problem, activate it again
+		
 	DeleteFuserInstance(instance);
-    return FUSER_SUCCESS;
+	free(FuserEvents);
+    return FUSER_DEVICEMOUNT_SUCCESS;
 }
 
 
@@ -636,9 +683,9 @@ DispatchUnmount(
 
 	fileInfo.ProcessId = EventContext->ProcessId;
 
-	if (FuserInstance->FuserOperations->Unmount) {
+	if (FuserInstance->FuserEvents->Unmount) {
 		// ignore return value
-		FuserInstance->FuserOperations->Unmount(&fileInfo);
+		FuserInstance->FuserEvents->Unmount(&fileInfo);
 	}
 
 	LeaveCriticalSection(&FuserInstance->CriticalSection);
@@ -703,8 +750,7 @@ DispatchCommon(
 	eventInfo->BufferLength = 0;
 	eventInfo->SerialNumber = EventContext->SerialNumber;
 
-	FuserFileInfo->ProcessId	= EventContext->ProcessId;
-	FuserFileInfo->FuserOptions = FuserInstance->FuserOptions;
+	FuserFileInfo->ProcessId	= EventContext->ProcessId;	
 	if (EventContext->FileFlags & FUSER_DELETE_ON_CLOSE) {
 		FuserFileInfo->DeleteOnClose = 1;
 	}

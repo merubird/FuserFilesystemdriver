@@ -384,6 +384,8 @@ NTSTATUS
 FuserFreeFCB(
   __in PFuserFCB Fcb);	
   
+ 
+ULONG GetBinaryVersion(); 
 
 PEVENT_CONTEXT
 AllocateEventContext(

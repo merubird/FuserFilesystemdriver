@@ -8,14 +8,16 @@ using FuserLowlevelDriver;
 namespace FuserNet{
 
     public enum FuserMountFinishStatus {
-        SUCCESS = 0,
-        GENERAL_UNKNOWN_ERROR = 1,
-        DRIVER_NOT_FOUND_ERROR = 2, //DLL not found
-        BAD_DRIVE_LETTER_ERROR = 3,
-        DRIVER_INSTALL_ERROR = 4,
-        START_ERROR = 5, // TODO: renaming, increase expressiveness
-        MOUNT_ERROR = 6, // TODO: renaming, increase expressiveness
-        MOUNT_POINT_ERROR = 7, // TODO: renaming, increase expressiveness
+        Success = 0,
+        Version_Error = -1,
+        Event_Load_Error = -2,
+        Bad_Mountpoint_Error = -3,
+        Driver_Install_Error = -4,
+        Driver_Start_Error = -5,
+        Mount_Error = -6,
+
+        General_Unknown_Error = -1000,
+        Driver_Not_Found_Error = -1001, //DLL not found
     }
 
 
@@ -27,7 +29,7 @@ namespace FuserNet{
 
 
         private FuserDevice FuserMountDevice;
-        private FuserDefinition.FUSER_OPTIONS FuserMountOptions;
+        private FuserDefinition.FUSER_MOUNT_PARAMETER FuserMountParam;
 
         private bool isMounted;
         private bool pDebugMode;
@@ -45,7 +47,8 @@ namespace FuserNet{
         
         public bool DebugMode { get { return this.pDebugMode; } set { this.pDebugMode = value; } }
 
-        public bool Mount(string mountPoint) {            
+        public bool Mount(string mountPoint) {
+            
             lock(this){
                 if (this.isMounted) {
                     return false;
@@ -63,16 +66,15 @@ namespace FuserNet{
 
 
                 this.FuserMountDevice = new FuserDevice(fsDevice, this.drive.Volumelabel, this.drive.Filesystem, this.drive.Serialnumber);
-                
-                this.FuserMountOptions = new FuserDefinition.FUSER_OPTIONS();
-                this.FuserMountOptions.Version = 600; // TODO: no longer exists
-                this.FuserMountOptions.ThreadCount = 0; // TODO: Determine and adjust the correct value
-                this.FuserMountOptions.MountPoint = mountPoint;
 
-                this.FuserMountOptions.Options = 0;
-                this.FuserMountOptions.Options |= this.pDebugMode ? FuserDefinition.FUSER_OPTION_DEBUG : 0;                           
-                this.FuserMountOptions.Options |= FuserDefinition.FUSER_OPTION_KEEP_ALIVE;
-                this.FuserMountOptions.Options |= FuserDefinition.FUSER_OPTION_HEARTBEAT;
+                this.FuserMountParam = new FuserDefinition.FUSER_MOUNT_PARAMETER();
+                this.FuserMountParam.ThreadsCount = 0;
+                this.FuserMountParam.MountPoint = mountPoint;
+
+                // TODO: Use options
+                this.FuserMountParam.Flags = 0;
+                this.FuserMountParam.Flags |= this.pDebugMode ? FuserDefinition.FUSER_MOUNT_PARAMETER_FLAG_STDERR : 0;
+                this.FuserMountParam.Flags |= FuserDefinition.FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT;
 
 
 
@@ -89,35 +91,34 @@ namespace FuserNet{
             return true;
         }
 
-        private void pvStart() {            
-            FuserMountFinishStatus mountReturnCode = FuserMountFinishStatus.GENERAL_UNKNOWN_ERROR;
+        private void pvStart() {
+            FuserMountFinishStatus mountReturnCode = FuserMountFinishStatus.General_Unknown_Error;
             
             try {
                 int dllstatus = 0;
-                dllstatus = FuserLinkLibraryCall.DeviceMount(this.FuserMountOptions, this.FuserMountDevice);
-
+                
+                dllstatus = FuserLinkLibraryCall.DeviceMount(this.FuserMountParam, this.FuserMountDevice);
+                
                 switch (dllstatus) {
-                    case FuserDefinition.FUSER_SUCCESS:              mountReturnCode = FuserMountFinishStatus.SUCCESS;                break;
-                    case FuserDefinition.FUSER_ERROR:                mountReturnCode = FuserMountFinishStatus.GENERAL_UNKNOWN_ERROR;  break;
-                    case FuserDefinition.FUSER_DRIVE_LETTER_ERROR:   mountReturnCode = FuserMountFinishStatus.BAD_DRIVE_LETTER_ERROR; break;
-                    case FuserDefinition.FUSER_DRIVER_INSTALL_ERROR: mountReturnCode = FuserMountFinishStatus.DRIVER_INSTALL_ERROR;   break;
-                    case FuserDefinition.FUSER_START_ERROR:          mountReturnCode = FuserMountFinishStatus.START_ERROR;            break;
-                    case FuserDefinition.FUSER_MOUNT_ERROR:          mountReturnCode = FuserMountFinishStatus.MOUNT_ERROR;            break;
-                    case FuserDefinition.FUSER_MOUNT_POINT_ERROR:    mountReturnCode = FuserMountFinishStatus.MOUNT_POINT_ERROR;      break;
-                    
-                    default:                                         mountReturnCode = FuserMountFinishStatus.GENERAL_UNKNOWN_ERROR;  break;
-                }
+                    case FuserDefinition.FUSER_DEVICEMOUNT_SUCCESS: mountReturnCode = FuserMountFinishStatus.Success; break;
+                    case FuserDefinition.FUSER_DEVICEMOUNT_VERSION_ERROR: mountReturnCode = FuserMountFinishStatus.Version_Error; break;
+                    case FuserDefinition.FUSER_DEVICEMOUNT_EVENT_LOAD_ERROR: mountReturnCode = FuserMountFinishStatus.Event_Load_Error; break;
+                    case FuserDefinition.FUSER_DEVICEMOUNT_BAD_MOUNT_POINT_ERROR: mountReturnCode = FuserMountFinishStatus.Bad_Mountpoint_Error; break;
+                    case FuserDefinition.FUSER_DEVICEMOUNT_DRIVER_INSTALL_ERROR: mountReturnCode = FuserMountFinishStatus.Driver_Install_Error; break;
+                    case FuserDefinition.FUSER_DEVICEMOUNT_DRIVER_START_ERROR: mountReturnCode = FuserMountFinishStatus.Driver_Start_Error; break;
+                    case FuserDefinition.FUSER_DEVICEMOUNT_MOUNT_ERROR: mountReturnCode = FuserMountFinishStatus.Mount_Error; break;
 
-
-
+                    default: mountReturnCode = FuserMountFinishStatus.General_Unknown_Error; break;
+                }                
+            
             }catch (DllNotFoundException de){
                 de.ToString();
-                mountReturnCode = FuserMountFinishStatus.DRIVER_NOT_FOUND_ERROR;
+                mountReturnCode = FuserMountFinishStatus.Driver_Not_Found_Error;
             } catch (Exception e) {
                 e.ToString();
-                mountReturnCode = FuserMountFinishStatus.GENERAL_UNKNOWN_ERROR;
+                mountReturnCode = FuserMountFinishStatus.General_Unknown_Error;
             }
-
+          
             try {
                 this.drive.Unmounted(mountReturnCode);
             }

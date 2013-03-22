@@ -281,8 +281,8 @@ DispatchQueryInformation(
 
 	DbgPrint("###GetFileInfo %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
-	if (FuserInstance->FuserOperations->GetFileInformation) {
-		result = FuserInstance->FuserOperations->GetFileInformation(
+	if (FuserInstance->FuserEvents->GetFileInformation) {
+		result = FuserInstance->FuserEvents->GetFileInformation(
 										EventContext->File.FileName,
 										&byHandleFileInfo,
 										&fileInfo);

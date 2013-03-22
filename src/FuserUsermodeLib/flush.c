@@ -42,9 +42,9 @@ DispatchFlush(
 
 	eventInfo->Status = STATUS_SUCCESS;
 
-	if (FuserInstance->FuserOperations->FlushFileBuffers) {
+	if (FuserInstance->FuserEvents->FlushFileBuffers) {
 
-		status = FuserInstance->FuserOperations->FlushFileBuffers(
+		status = FuserInstance->FuserEvents->FlushFileBuffers(
 					EventContext->Flush.FileName,
 					&fileInfo);
 

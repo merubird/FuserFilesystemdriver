@@ -42,10 +42,10 @@ DispatchClose(
 
 	DbgPrint("###Close %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
-	if (FuserInstance->FuserOperations->CloseFile) {
+	if (FuserInstance->FuserEvents->CloseFile) {
 		// ignore return value
 		// TODO: Adapt the structure of the cleanup so that no return value can be transferred
-		FuserInstance->FuserOperations->CloseFile(
+		FuserInstance->FuserEvents->CloseFile(
 			EventContext->Close.FileName, &fileInfo);
 	}
 

@@ -562,7 +562,7 @@ DispatchDirectoryInformation(
 		DbgPrint("###FindFiles %04d\n", openInfo->EventId);
 
 		// if user defined FindFilesWithPattern
-		if (FuserInstance->FuserOperations->FindFilesWithPattern) {
+		if (FuserInstance->FuserEvents->FindFilesWithPattern) {
 			LPCWSTR	pattern = L"*";
 		
 			// if search pattern is specified
@@ -573,18 +573,18 @@ DispatchDirectoryInformation(
 
 			patternCheck = FALSE; // do not recheck pattern later in MatchFiles
 
-			status = FuserInstance->FuserOperations->FindFilesWithPattern(
+			status = FuserInstance->FuserEvents->FindFilesWithPattern(
 						EventContext->Directory.DirectoryName,
 						pattern,
 						FuserFillFileData,
 						&fileInfo);
 	
-		} else if (FuserInstance->FuserOperations->FindFiles) {
+		} else if (FuserInstance->FuserEvents->FindFiles) {
 
 			patternCheck = TRUE; // do pattern check later in MachFiles
 
 			// call FileSystem specifeid callback routine
-			status = FuserInstance->FuserOperations->FindFiles(
+			status = FuserInstance->FuserEvents->FindFiles(
 						EventContext->Directory.DirectoryName,
 						FuserFillFileData,
 						&fileInfo);

@@ -54,10 +54,10 @@ int FuserGetVolumeInformation(
 
 ULONG
 FuserFsVolumeInformation(
-	PEVENT_INFORMATION	EventInfo,
-	PEVENT_CONTEXT		EventContext,
-	PFUSER_FILE_INFO	FileInfo,
-	PFUSER_OPERATIONS	FuserOperations)
+	PEVENT_INFORMATION		EventInfo,
+	PEVENT_CONTEXT			EventContext,
+	PFUSER_FILE_INFO		FileInfo,
+	PFUSER_EVENT_CALLBACKS	FuserEvents)
 {
 	WCHAR	volumeName[MAX_PATH];
 	DWORD	volumeSerial;
@@ -73,9 +73,9 @@ FuserFsVolumeInformation(
 		(PFILE_FS_VOLUME_INFORMATION)EventInfo->Buffer;
 
 	
-	if (!FuserOperations->GetVolumeInformation) {
+	if (!FuserEvents->GetVolumeInformation) {
 		//return STATUS_NOT_IMPLEMENTED;
-		FuserOperations->GetVolumeInformation = FuserGetVolumeInformation;
+		FuserEvents->GetVolumeInformation = FuserGetVolumeInformation;
 	}
 
 	remainingLength = EventContext->Volume.BufferLength;
@@ -88,7 +88,7 @@ FuserFsVolumeInformation(
 	RtlZeroMemory(volumeName, sizeof(volumeName));
 	RtlZeroMemory(fsName, sizeof(fsName));
 
-	status = FuserOperations->GetVolumeInformation(
+	status = FuserEvents->GetVolumeInformation(
 				volumeName,							// VolumeNameBuffer
 				sizeof(volumeName) / sizeof(WCHAR), // VolumeNameSize
 				&volumeSerial,						// VolumeSerialNumber
@@ -141,10 +141,10 @@ int FuserGetDiskFreeSpace(
 
 ULONG
 FuserFsSizeInformation(
-	PEVENT_INFORMATION	EventInfo,
-	PEVENT_CONTEXT		EventContext,
-	PFUSER_FILE_INFO	FileInfo,
-	PFUSER_OPERATIONS	FuserOperations)
+	PEVENT_INFORMATION		EventInfo,
+	PEVENT_CONTEXT			EventContext,
+	PFUSER_FILE_INFO		FileInfo,
+	PFUSER_EVENT_CALLBACKS	FuserEvents)
 {
 	ULONGLONG	freeBytesAvailable = 0;
 	ULONGLONG	totalBytes = 0;
@@ -155,16 +155,16 @@ FuserFsSizeInformation(
 	PFILE_FS_SIZE_INFORMATION sizeInfo = (PFILE_FS_SIZE_INFORMATION)EventInfo->Buffer;
 
 	
-	if (!FuserOperations->GetDiskFreeSpace) {
+	if (!FuserEvents->GetDiskFreeSpace) {
 		//return STATUS_NOT_IMPLEMENTED;
-		FuserOperations->GetDiskFreeSpace = FuserGetDiskFreeSpace;
+		FuserEvents->GetDiskFreeSpace = FuserGetDiskFreeSpace;
 	}
 
 	if (EventContext->Volume.BufferLength < sizeof(FILE_FS_SIZE_INFORMATION) ) {
 		return STATUS_BUFFER_OVERFLOW;
 	}
 
-	status = FuserOperations->GetDiskFreeSpace(
+	status = FuserEvents->GetDiskFreeSpace(
 		&freeBytesAvailable, // FreeBytesAvailable
 		&totalBytes, // TotalNumberOfBytes
 		&freeBytes, // TotalNumberOfFreeBytes
@@ -189,10 +189,10 @@ FuserFsSizeInformation(
 
 ULONG
 FuserFsAttributeInformation(
-	PEVENT_INFORMATION	EventInfo,
-	PEVENT_CONTEXT		EventContext,
-	PFUSER_FILE_INFO	FileInfo,
-	PFUSER_OPERATIONS	FuserOperations)
+	PEVENT_INFORMATION		EventInfo,
+	PEVENT_CONTEXT			EventContext,
+	PFUSER_FILE_INFO		FileInfo,
+	PFUSER_EVENT_CALLBACKS	FuserEvents)
 {
 	WCHAR	volumeName[MAX_PATH];
 	DWORD	volumeSerial;
@@ -207,8 +207,8 @@ FuserFsAttributeInformation(
 	PFILE_FS_ATTRIBUTE_INFORMATION attrInfo = 
 		(PFILE_FS_ATTRIBUTE_INFORMATION)EventInfo->Buffer;
 	
-	if (!FuserOperations->GetVolumeInformation) {
-		FuserOperations->GetVolumeInformation = FuserGetVolumeInformation;
+	if (!FuserEvents->GetVolumeInformation) {
+		FuserEvents->GetVolumeInformation = FuserGetVolumeInformation;
 		//return STATUS_NOT_IMPLEMENTED;
 	}
 
@@ -222,7 +222,7 @@ FuserFsAttributeInformation(
 	RtlZeroMemory(volumeName, sizeof(volumeName));
 	RtlZeroMemory(fsName, sizeof(fsName));
 
-	status = FuserOperations->GetVolumeInformation(
+	status = FuserEvents->GetVolumeInformation(
 				volumeName,			// VolumeNameBuffer
 				sizeof(volumeName),	// VolumeNameSize
 				&volumeSerial,		// VolumeSerialNumber
@@ -262,10 +262,10 @@ FuserFsAttributeInformation(
 
 ULONG
 FuserFsFullSizeInformation(
-	PEVENT_INFORMATION	EventInfo,
-	PEVENT_CONTEXT		EventContext,
-	PFUSER_FILE_INFO	FileInfo,
-	PFUSER_OPERATIONS	FuserOperations)
+	PEVENT_INFORMATION		EventInfo,
+	PEVENT_CONTEXT			EventContext,
+	PFUSER_FILE_INFO		FileInfo,
+	PFUSER_EVENT_CALLBACKS	FuserEvents)
 {
 	ULONGLONG	freeBytesAvailable = 0;
 	ULONGLONG	totalBytes = 0;
@@ -276,8 +276,8 @@ FuserFsFullSizeInformation(
 	PFILE_FS_FULL_SIZE_INFORMATION sizeInfo = (PFILE_FS_FULL_SIZE_INFORMATION)EventInfo->Buffer;
 
 	
-	if (!FuserOperations->GetDiskFreeSpace) {
-		FuserOperations->GetDiskFreeSpace = FuserGetDiskFreeSpace;
+	if (!FuserEvents->GetDiskFreeSpace) {
+		FuserEvents->GetDiskFreeSpace = FuserGetDiskFreeSpace;
 		//return STATUS_NOT_IMPLEMENTED;
 	}
 
@@ -285,7 +285,7 @@ FuserFsFullSizeInformation(
 		return STATUS_BUFFER_OVERFLOW;
 	}
 
-	status = FuserOperations->GetDiskFreeSpace(
+	status = FuserEvents->GetDiskFreeSpace(
 		&freeBytesAvailable, // FreeBytesAvailable
 		&totalBytes, // TotalNumberOfBytes
 		&freeBytes, // TotalNumberOfFreeBytes
@@ -337,8 +337,7 @@ DispatchQueryVolumeInformation(
 	eventInfo->SerialNumber = EventContext->SerialNumber;
 
 	fileInfo.ProcessId = EventContext->ProcessId;
-	fileInfo.FuserOptions = FuserInstance->FuserOptions;
-
+	
 	eventInfo->Status = STATUS_NOT_IMPLEMENTED;
 	eventInfo->BufferLength = 0;
 
@@ -347,21 +346,21 @@ DispatchQueryVolumeInformation(
 	switch (EventContext->Volume.FsInformationClass) {
 	case FileFsVolumeInformation:
 		eventInfo->Status = FuserFsVolumeInformation(
-								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileFsSizeInformation:
 		eventInfo->Status = FuserFsSizeInformation(
-								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 	case FileFsAttributeInformation:
 		eventInfo->Status = FuserFsAttributeInformation(
-								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	case FileFsFullSizeInformation:
 		eventInfo->Status = FuserFsFullSizeInformation(
-								eventInfo, EventContext, &fileInfo, FuserInstance->FuserOperations);
+								eventInfo, EventContext, &fileInfo, FuserInstance->FuserEvents);
 		break;
 
 	default:
