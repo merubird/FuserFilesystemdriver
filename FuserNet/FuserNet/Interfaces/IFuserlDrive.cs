@@ -12,7 +12,7 @@ namespace FuserNet
         string Filesystem { get; }
         uint Serialnumber { get; }
 
-        void Mounted(string MountPoint, string DeviceName);
+        void Mounted(string MountPoint, string RawDevice);
         void Unmounted(FuserMountFinishStatus returncode);
 
         ulong DiskspaceTotalBytes { get; }

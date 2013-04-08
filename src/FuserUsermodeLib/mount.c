@@ -189,8 +189,7 @@ BOOL FUSERAPI FuserAgentControl(PFUSER_CONTROL Control) {
 BOOL
 FuserMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName,
-	BOOL    UseHeartbeatControl)
+	LPCWSTR	DeviceName)
 {
 	FUSER_CONTROL control;
 
@@ -198,10 +197,7 @@ FuserMount(
 	control.Type = FUSER_CONTROL_MOUNT;
 	control.Option = 0;
 	// TODO: Add Version to control and check in fuserdeviceagent
-	if (UseHeartbeatControl){
-		control.Option = 1;
-	}
-
+	
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
 

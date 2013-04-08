@@ -32,9 +32,9 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 // *  Definitionen:                               *
 // ************************************************
 
-#define FUSER_DEBUG_DEFAULT 0
+#define FUSER_DEBUGMODE 0 //Enabled Console output and other debug options, for release must be 0
 
-extern ULONG g_Debug; // TODO: find out where is used
+extern ULONG DebugMode;
 
 #define FUSER_DEFAULT_VOLUME_LABEL			L"Fuser Filesystem Driver"
 #define FUSER_DEFAULT_SERIALNUMBER			0x19831116;
@@ -52,7 +52,7 @@ extern ULONG g_Debug; // TODO: find out where is used
 
 #define FUSER_NET_DEVICE_NAME		  	    L"\\Device\\FuserRedirector"   // TODO remove networkprovider
 #define FUSER_NET_SYMBOLIC_LINK_NAME        L"\\DosDevices\\Global\\FuserRedirector"   // TODO remove networkprovider
-							
+
 #define FUSER_BASE_GUID						{0xb9892757, 0x6a70, 0x4e51, {0x9e, 0xaf, 0x9e, 0xf1, 0xe0, 0x93, 0xb0, 0xe8}} // {b9892757-6a70-4e51-9eaf-9ef1e093b0e8}
 
 	
@@ -75,10 +75,10 @@ extern ULONG g_Debug; // TODO: find out where is used
 
 #if _WIN32_WINNT > 0x501
 	#define FDbgPrint(...) \
-	if (g_Debug) { KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "[FuserFS] " __VA_ARGS__ )); }	
+	if (DebugMode) { KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_TRACE_LEVEL, "[FuserFS] " __VA_ARGS__ )); }	
 #else
 	#define FDbgPrint(...) \
-		if (g_Debug) { DbgPrint("[FuserFS] " __VA_ARGS__); }
+		if (DebugMode) { DbgPrint("[FuserFS] " __VA_ARGS__); }
 		
 #endif
 
@@ -350,16 +350,17 @@ __drv_dispatchType(IRP_MJ_LOCK_CONTROL)				DRIVER_DISPATCH FuserDispatchLock;
 __drv_dispatchType(IRP_MJ_QUERY_SECURITY)			DRIVER_DISPATCH FuserDispatchQuerySecurity; // TODO: remove support for filesecurity
 __drv_dispatchType(IRP_MJ_SET_SECURITY)				DRIVER_DISPATCH FuserDispatchSetSecurity;   // TODO: remove support for filesecurity
 
+// TODO: check what driver_dispatches have to do
 //DRIVER_CANCEL FuserEventCancelRoutine; // TODO: Check where is this method used
 DRIVER_UNLOAD	FuserUnload;
 DRIVER_CANCEL	FuserIrpCancelRoutine;
 DRIVER_DISPATCH FuserRegisterPendingIrpForEvent;
 DRIVER_DISPATCH FuserRegisterPendingIrpForService;
 DRIVER_DISPATCH FuserCompleteIrp;
-DRIVER_DISPATCH FuserResetPendingIrpTimeout;
-DRIVER_DISPATCH FuserGetAccessToken;
+//DRIVER_DISPATCH FuserGetAccessToken; // TODO: Check where is this method used
 DRIVER_DISPATCH FuserEventStart;
 DRIVER_DISPATCH FuserEventWrite;
+// TODO: check what it has to do with this driver_dispatch
 
 	
 

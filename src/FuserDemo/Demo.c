@@ -24,20 +24,38 @@ THE SOFTWARE.
 
 
 #include <windows.h>
-//   #include <winbase.h>
+#include <process.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "fuser.h"
 //  #include "fileinfo.h"
+
+typedef struct _HEARTBEAT_DATA {	
+	//Heartbeat:
+	BOOL			HeartbeatActive;
+	HANDLE			HeartbeatThread;	
+	BOOL			HeartbeatAbort;
+	WCHAR			MountPoint[MAX_PATH];
+	WCHAR			DeviceName[MAX_PATH];
+	
+	
+} HEARTBEAT_DATA, *PHEARTBEAT_DATA;
+
+
+
+
 
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
 static WCHAR RootDirectory[MAX_PATH] = L"C:";
 static WCHAR MountPoint[MAX_PATH] = L"M:";
-
+static HEARTBEAT_DATA HeartbeatData;
 
 #define MirrorCheckFlag(val, flag) if (val&flag) { DbgPrint(L"\t" L#flag L"\n"); }
+
+
+
 
 
 
@@ -110,6 +128,28 @@ GetFilePath(
 	RtlZeroMemory(filePath, numberOfElements * sizeof(WCHAR));
 	wcsncpy_s(filePath, numberOfElements, RootDirectory, wcslen(RootDirectory));
 	wcsncat_s(filePath, numberOfElements, FileName, wcslen(FileName));
+}
+
+DWORD WINAPI
+Heartbeat (PHEARTBEAT_DATA hData)
+{
+	int c = 0;
+	while(1){
+		if (hData->HeartbeatAbort){
+			break;
+		}
+		
+		c++;
+		if (c >= 5){
+			FuserSendHeartbeat(hData->MountPoint, hData->DeviceName);
+			c = 0;
+		}		
+		Sleep(100);		
+	}
+	
+	
+	HeartbeatData.HeartbeatThread = NULL;
+	return 0;
 }
 
 
@@ -1043,6 +1083,35 @@ MirrorUnmount(
 	return 0;
 }
 
+
+static int
+MirrorMount(
+	LPCWSTR	MountPoint, 
+	LPCWSTR	DeviceName, 
+	LPCWSTR	RawDevice)
+{
+	HANDLE	threadId = 0;
+	
+	
+	wcscpy_s(HeartbeatData.MountPoint,  MAX_PATH / sizeof(WCHAR), MountPoint);
+	wcscpy_s(HeartbeatData.DeviceName,  MAX_PATH / sizeof(WCHAR), DeviceName);
+	
+	threadId = (HANDLE)_beginthreadex(
+			NULL, // Security Atributes
+			0, //stack size
+			Heartbeat,
+			&HeartbeatData, // param
+			0, // create flag
+			NULL);
+	
+	HeartbeatData.HeartbeatThread = threadId;
+	return 0;
+}
+
+
+
+	
+
 static int EventLoader (ULONG c, PFUSER_EVENT ev){
 	switch (c) {
 		case 0:		ev->CreateFile = MirrorCreateFile; 						return	FUSER_EVENT_CREATE_FILE;			break;
@@ -1068,6 +1137,7 @@ static int EventLoader (ULONG c, PFUSER_EVENT ev){
 		case 20:	ev->SetFileSecurity = MirrorSetFileSecurity;			return	FUSER_EVENT_SET_FILESECURITY;		break;
 		case 21:	ev->GetVolumeInformation = MirrorGetVolumeInformation;	return	FUSER_EVENT_GET_VOLUME_INFORMATION;	break;
 		case 22:	ev->Unmount = MirrorUnmount;							return	FUSER_EVENT_UNMOUNT;				break;
+		case 23:	ev->Mount = MirrorMount;								return	FUSER_EVENT_MOUNT;					break;
 		default:
 			return 0;
 	}
@@ -1143,8 +1213,18 @@ wmain(ULONG argc, PWCHAR argv[])
 	}
 	
 	MountParameter->EventLoader = EventLoader;
-
+	
+	HeartbeatData.HeartbeatActive = FALSE;
+	HeartbeatData.HeartbeatThread = NULL;
+	HeartbeatData.HeartbeatAbort = FALSE;
+		
 	status = FuserDeviceMount(MountParameter);
+	
+	if (HeartbeatData.HeartbeatThread != NULL){
+		HeartbeatData.HeartbeatAbort = TRUE;
+		WaitForSingleObject(HeartbeatData.HeartbeatThread, INFINITE);
+	}
+	
 	switch (status) {
 	case FUSER_DEVICEMOUNT_SUCCESS:
 		fprintf(stderr, "Success\n");

@@ -113,7 +113,7 @@ InsertMountEntry(PFUSER_CONTROL FuserControl)
 
 PMOUNT_ENTRY
 FindMountEntry(PFUSER_CONTROL	FuserControl)
-{
+{ // TODO: revise, to all with raw-device
 	PLIST_ENTRY		listEntry;
 	PMOUNT_ENTRY	mountEntry;
 	BOOL			useMountPoint = wcslen(FuserControl->MountPoint) > 0;
@@ -232,10 +232,10 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 		if (FuserControlMount(Control->MountPoint, Control->DeviceName )) {			
 			Control->Status = FUSER_CONTROL_SUCCESS;
 			mountEntry = InsertMountEntry(Control);
-			if (Control->Option == 1) {
-				// enable heartbeat-control:
-				HeartbeatStart(mountEntry);
-			}			
+			
+			// enable heartbeat-control:
+			HeartbeatStart(mountEntry);
+		
 		} else {
 			Control->Status = FUSER_CONTROL_FAIL;
 		}

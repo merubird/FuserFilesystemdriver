@@ -341,7 +341,6 @@ DispatchQueryVolumeInformation(
 	eventInfo->Status = STATUS_NOT_IMPLEMENTED;
 	eventInfo->BufferLength = 0;
 
-	DbgPrint("###QueryVolumeInfo %04d\n", openInfo ? openInfo->EventId : -1);
 
 	switch (EventContext->Volume.FsInformationClass) {
 	case FileFsVolumeInformation:

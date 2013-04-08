@@ -279,8 +279,6 @@ DispatchQueryInformation(
 
 	eventInfo->BufferLength = EventContext->File.BufferLength;
 
-	DbgPrint("###GetFileInfo %04d\n", openInfo != NULL ? openInfo->EventId : -1);
-
 	if (FuserInstance->FuserEvents->GetFileInformation) {
 		result = FuserInstance->FuserEvents->GetFileInformation(
 										EventContext->File.FileName,

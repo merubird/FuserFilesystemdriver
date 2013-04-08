@@ -80,7 +80,7 @@ VOID ShowMountList()
 	while(FuserAgentControl(&control)) {
 		if (control.Status == FUSER_CONTROL_SUCCESS) {
 			ZeroMemory(partBuff, sizeof(partBuff));
-			_snwprintf(partBuff,100, L"[%d] MountPoint: %s  \t> DeviceName: %s\n",
+			_snwprintf(partBuff,100, L"[%d] MountPoint: %s  \t> Device: %s\n",
 				control.Option, control.MountPoint, control.DeviceName);
 						
 			wcscat_s(buffer, MAX_BUFFER_SIZE, partBuff);				
@@ -361,7 +361,7 @@ VOID ShowVersion(){
 	FUSER_VERSION_SINGLE ver;
 	ZeroMemory(buffer, sizeof(buffer));
 	
-	ver.SingleValue = FuserVersion(); // TODO: check whether the value can be read out directly without using ULONG
+	ver.SingleValue = FuserVersion();
 	if (ver.SingleValue == 0){		
 		DisplayWarning(L"Fuser Filesystemdriver does not work correct! Perhaps different driver parts installed or driver is not running.");
 	} else {

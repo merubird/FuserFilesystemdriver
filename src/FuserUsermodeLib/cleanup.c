@@ -40,7 +40,6 @@ DispatchCleanup(
 	
 	eventInfo->Status = STATUS_SUCCESS; // return success at any case
 
-	DbgPrint("###Cleanup %04d\n", openInfo != NULL ? openInfo->EventId : -1);
 
 	if (FuserInstance->FuserEvents->Cleanup) {
 		// ignore return value

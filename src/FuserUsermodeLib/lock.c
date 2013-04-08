@@ -39,8 +39,6 @@ DispatchLock(
 	eventInfo = DispatchCommon(
 		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
-	DbgPrint("###Lock %04d\n", openInfo != NULL ? openInfo->EventId : -1);
-
 	eventInfo->Status = STATUS_NOT_IMPLEMENTED;
 
 	switch (EventContext->MinorFunction) {

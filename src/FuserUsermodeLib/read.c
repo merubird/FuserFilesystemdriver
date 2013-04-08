@@ -41,8 +41,6 @@ DispatchRead(
 	eventInfo = DispatchCommon(
 		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
-	DbgPrint("###Read %04d\n", openInfo != NULL ? openInfo->EventId : -1);
-
 	if (FuserInstance->FuserEvents->ReadFile) {
 		status = FuserInstance->FuserEvents->ReadFile(
 						EventContext->Read.FileName,

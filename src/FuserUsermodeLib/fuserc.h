@@ -38,7 +38,9 @@ extern "C" {
 #define FUSER_AGENT_CONTROL_PIPE		L"\\\\.\\pipe\\FuserDeviceAgentCommand" //communication with FuserDeviceAgent
 
 
-#define FUSER_MAX_THREAD		15
+#define FUSER_THREADS_MAX		15		//maximum worker threads for fuser multithreading
+#define FUSER_THREADS_DEFAULT	7		//default count threads for fuser multithreading
+
 
 
 #define FUSER_CONTROL_MOUNT			1
@@ -59,7 +61,7 @@ extern "C" {
 
 #define FUSER_KEEPALIVE_TIME	3000 // in miliseconds       // TODO: should be moved to .NET class
 
-// TODO: Remove both variables:
+// TODO: Reflect for alternative (.net), maybe remove both variables:
 // FuserOptions->DebugMode is ON?
 extern	BOOL	g_DebugMode;
 

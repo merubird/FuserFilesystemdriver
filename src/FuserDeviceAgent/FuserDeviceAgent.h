@@ -51,6 +51,19 @@ extern "C" {
 
 
 
+// ---------------------------------------------------------------------
+//                 H E A R T B E A T
+//
+
+#define HEARTBEAT_INTERVAL              500  		// (miliseconds) Interval to work the Heartbeat-procedure
+#define HEARTBEAT_TIMEOUT     			1000 * 10	// (miliseconds) Timeout for autmatic device-unmount if no heartbeat signal found.  should be multiple of HEARTBEAT_INTERVAL
+#define HEARTBEAT_SENDKEEPALIVE			1000 * 3    // (miliseconds) Interval for automatic send KeepAlive to the driver. Should be a multiple of HEARTBEAT_INTERVAL
+// ---------------------------------------------------------------------
+
+
+
+
+
 
 
 typedef struct _MOUNT_ENTRY {

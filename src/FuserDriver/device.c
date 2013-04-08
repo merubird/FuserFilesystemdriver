@@ -389,16 +389,7 @@ GlobalDeviceControl(
 		status = FuserRegisterPendingIrpForService(DeviceObject, Irp);
 		break;
 
-	case IOCTL_SET_DEBUG_MODE:
-		{
-			if (irpSp->Parameters.DeviceIoControl.InputBufferLength >= sizeof(ULONG)) {
-				g_Debug = *(ULONG*)Irp->AssociatedIrp.SystemBuffer;
-				status = STATUS_SUCCESS;
-			}
-			FDbgPrint("  IOCTL_SET_DEBUG_MODE: %d\n", g_Debug);
-		}
-		break;
-
+	
 	case IOCTL_GET_VERSION:
 		if (irpSp->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(ULONG)) {			
 			*(ULONG*)Irp->AssociatedIrp.SystemBuffer = GetBinaryVersion();
@@ -517,12 +508,6 @@ FuserDispatchDeviceControl(
 			}
 			break;
 
-		case IOCTL_RESET_TIMEOUT:
-			status = FuserResetPendingIrpTimeout(DeviceObject, Irp);
-			break;
-		case IOCTL_GET_ACCESS_TOKEN:
-			status = FuserGetAccessToken(DeviceObject, Irp); // TODO: test for what, then perhaps remove
-			break;
 		default:
 			{
 				PrintUnknownDeviceIoctlCode(irpSp->Parameters.DeviceIoControl.IoControlCode);

@@ -39,21 +39,21 @@ namespace FuserLowlevelDriver {
 
 
  
-
-
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        public struct FUSER_FILE_INFO {
-            // TODO: Completely revise with driver / check values if necessary / check in driver
+        public struct FUSER_FILE_INFO {            
+            public ulong FuserContext;  //only for internal (driver) use. don't touch this.
             public ulong Context; // TODO: change datatype, long or int
-            public ulong FuserContext;            
-            public uint ProcessId;
-            public byte IsDirectory;
-            public byte DeleteOnClose;
-            public byte PagingIo;
-            public byte SynchronousIo;
-            public byte Nocache;
-            public byte WriteToEndOfFile;
+            public uint ProcessId;      //process id for the thread that originally requested a given I/O operation
+
+            public byte IsDirectory;        // requesting a directory file
+            public byte DeleteOnClose;      // Delete on when "cleanup" is called
+            public byte PagingIo;           // Read or write is paging IO.
+            public byte SynchronousIo;      // Read or write is synchronous IO.
+            public byte Nocache;            
+            public byte WriteToEndOfFile;   // If true, write to the current end of file instead of Offset parameter.
         }
+
+
         
         
         // -> change method FuserDriverMounter.pvStart()
@@ -67,9 +67,8 @@ namespace FuserLowlevelDriver {
                 
         public const uint FUSER_MOUNT_PARAMETER_FLAG_DEBUG		=	1;   // ouput debug message
         public const uint FUSER_MOUNT_PARAMETER_FLAG_STDERR		=	2;   // ouput debug message to stderr
-        public const uint FUSER_MOUNT_PARAMETER_FLAG_USEADS		=	4;	// use Alternate Data Streams (e.g. C:\TEMP\TEST.TXT:ADS.file)
-        public const uint FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT 	=	8; 	//  use heartbeat-check for device alive-control
-        public const uint FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE = 16;  //  DeviceType: Removable-Device	
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_USEADS		=	4;	// use Alternate Data Streams (e.g. C:\TEMP\TEST.TXT:ADS.file)        
+        public const uint FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE = 8;  //  DeviceType: Removable-Device	
 
 
 

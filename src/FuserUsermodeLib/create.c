@@ -29,7 +29,6 @@ DispatchCreate(
 	PEVENT_CONTEXT		EventContext,
 	PFUSER_INSTANCE		FuserInstance)
 {
-	static eventId = 0;
 	ULONG					length	  = sizeof(EVENT_INFORMATION);
 	PEVENT_INFORMATION		eventInfo = (PEVENT_INFORMATION)malloc(length);
 	int						status;
@@ -55,7 +54,7 @@ DispatchCreate(
 	ZeroMemory(openInfo, sizeof(FUSER_OPEN_INFO));
 	openInfo->OpenCount = 2;
 	openInfo->EventContext = EventContext;
-	openInfo->FuserInstance = FuserInstance;
+	//openInfo->FuserInstance = FuserInstance; TODO: remove
 	fileInfo.FuserContext = (ULONG64)openInfo;
 
 	// pass it to driver and when the same handle is used get it back
@@ -89,9 +88,6 @@ DispatchCreate(
 		EventContext->Create.FileAttributes |= FILE_FLAG_DELETE_ON_CLOSE;
 	}
 
-	DbgPrint("###Create %04d\n", eventId);
-	//DbgPrint("### OpenInfo %X\n", openInfo);
-	openInfo->EventId = eventId++;
 
 	// make a directory or open
 	if (directoryRequested) {

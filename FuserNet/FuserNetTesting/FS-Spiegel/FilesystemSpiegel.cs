@@ -51,8 +51,8 @@ namespace Testsystem {
 
 
 
-        public void Mounted(string MountPoint, string DeviceName) {
-            Console.WriteLine("Mounted: " + MountPoint + "  Device: " + DeviceName);            
+        public void Mounted(string MountPoint, string RawDevice) {
+            Console.WriteLine("Mounted: " + MountPoint + "  Device: " + RawDevice);            
         }
 
 

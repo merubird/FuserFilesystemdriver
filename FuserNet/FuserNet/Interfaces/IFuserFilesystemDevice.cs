@@ -35,6 +35,6 @@ namespace FuserLowlevelDriver {
         Win32Returncode UnlockFile         (FuserFileHandler hFile, long offset, long length);
         
         Win32Returncode GetDiskFreeSpace   (ref ulong freeBytesAvailable, ref ulong totalBytes, ref ulong totalFreeBytes);
-        Win32Returncode Mount              (string MountPoint, string DeviceName);
+        Win32Returncode Mount              (string MountPoint, string RawDevice);
     }
 }

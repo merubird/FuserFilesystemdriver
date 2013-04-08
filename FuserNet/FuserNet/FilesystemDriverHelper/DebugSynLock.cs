@@ -79,8 +79,8 @@ namespace FuserNet {
             }
         }
 
-        public Win32Returncode Mount(string MountPoint, string DeviceName) {
-            { lock (this) { return this.sourceSystem.Mount(MountPoint, DeviceName); } }
+        public Win32Returncode Mount(string MountPoint, string RawDevice) {
+            { lock (this) { return this.sourceSystem.Mount(MountPoint, RawDevice); } }
         }
 
 

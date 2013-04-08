@@ -74,7 +74,7 @@ namespace FuserNet{
                 // TODO: Use options
                 this.FuserMountParam.Flags = 0;
                 this.FuserMountParam.Flags |= this.pDebugMode ? FuserDefinition.FUSER_MOUNT_PARAMETER_FLAG_STDERR : 0;
-                this.FuserMountParam.Flags |= FuserDefinition.FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT;
+                
 
 
 
@@ -137,7 +137,15 @@ namespace FuserNet{
                     return;                
             }
             try {
-                FuserLinkLibraryCall.DeviceUnmount(this.MountPoint);
+                string mp = "";
+                if (this.FuserMountDevice != null) {
+                    mp = this.FuserMountDevice.getMountPoint();
+                }
+                if (mp == "") {
+                    mp = this.MountPoint;
+                }
+
+                FuserLinkLibraryCall.DeviceUnmount(mp);
             } catch {
                 return;
             }

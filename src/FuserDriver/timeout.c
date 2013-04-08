@@ -289,64 +289,6 @@ Routine Description:
 
 
 
-
-NTSTATUS
-FuserResetPendingIrpTimeout(
-   __in PDEVICE_OBJECT	DeviceObject,
-   __in PIRP			Irp
-   )
-{
-	KIRQL				oldIrql;
-    PLIST_ENTRY			thisEntry, nextEntry, listHead;
-	PIRP_ENTRY			irpEntry;
-	PFuserVCB			vcb;
-	PEVENT_INFORMATION	eventInfo;
-	ULONG				timeout; // in milisecond
-
-
-	FDbgPrint("==> ResetPendingIrpTimeout\n");
-
-	eventInfo		= (PEVENT_INFORMATION)Irp->AssociatedIrp.SystemBuffer;
-	ASSERT(eventInfo != NULL);
-
-	timeout = eventInfo->ResetTimeout.Timeout;
-	if (FUSER_IRP_PENDING_TIMEOUT_RESET_MAX < timeout) {
-		timeout = FUSER_IRP_PENDING_TIMEOUT_RESET_MAX;
-	}
-	
-	vcb = DeviceObject->DeviceExtension;
-	if (GetIdentifierType(vcb) != VCB) {
-		return STATUS_INVALID_PARAMETER;
-	}
-	ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL);
-	KeAcquireSpinLock(&vcb->Dcb->PendingIrp.ListLock, &oldIrql);
-
-	// search corresponding IRP through pending IRP list
-	listHead = &vcb->Dcb->PendingIrp.ListHead;
-    for (thisEntry = listHead->Flink; thisEntry != listHead; thisEntry = nextEntry) {
-
-		PIRP				irp;
-		PIO_STACK_LOCATION	irpSp;
-
-        nextEntry = thisEntry->Flink;
-
-        irpEntry = CONTAINING_RECORD(thisEntry, IRP_ENTRY, ListEntry);
-
-		if (irpEntry->SerialNumber != eventInfo->SerialNumber)  {
-			continue;
-		}
-
-		FuserUpdateTimeout(&irpEntry->TickCount, timeout);
-		break;
-	}
-	KeReleaseSpinLock(&vcb->Dcb->PendingIrp.ListLock, oldIrql);
-	FDbgPrint("<== ResetPendingIrpTimeout\n");
-		
-	return STATUS_SUCCESS;
-}
-
-
-
 VOID
 FuserUpdateTimeout(
 	__out PLARGE_INTEGER TickCount,
@@ -386,14 +328,3 @@ Routine Description:
 }
 
 
-
-/* TODO: unused:
-NTSTATUS
-FuserInformServiceAboutUnmount(
-   __in PDEVICE_OBJECT	DeviceObject,
-   __in PIRP			Irp)
-{
-
-	return STATUS_SUCCESS;
-}
-*/

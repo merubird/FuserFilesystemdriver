@@ -19,7 +19,7 @@ namespace Testsystem
 
         
             Console.BufferWidth = 150;
-            Console.WindowWidth = Console.BufferWidth;
+            //Console.WindowWidth = Console.BufferWidth;
 
             Program p = new Program();
             p.progStart();                
@@ -43,7 +43,7 @@ namespace Testsystem
             vdm.DebugMode = true;
 
             string mountPoint;
-            mountPoint = @"J:\";
+            mountPoint = @"j:\";
             //mountPoint = @"C:\temp\ab";
 
             Console.WriteLine("--------  Start Fuser Drive -------");

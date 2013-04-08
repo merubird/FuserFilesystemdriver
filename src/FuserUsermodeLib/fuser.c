@@ -32,10 +32,11 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "fuseri.h"
 #include "list.h"
 
-// TODO: Remove both variables
+// TODO: recheck or remove
 // FuserOptions->DebugMode is ON?
 BOOL	g_DebugMode = TRUE;
 
+// TODO: recheck or remove
 // FuserOptions->UseStdErr is ON?
 BOOL	g_UseStdErr = FALSE;
 
@@ -59,7 +60,7 @@ FuserLoop(
 	RtlZeroMemory(buffer, sizeof(buffer));
 
 	device = CreateFile(
-				GetRawDeviceName(FuserInstance->DeviceName), // lpFileName
+				FuserInstance->RawDevice, // lpFileName
 				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
 				FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
 				NULL,                               // lpSecurityAttributes
@@ -70,7 +71,7 @@ FuserLoop(
 
 	if (device == INVALID_HANDLE_VALUE) {
 		DbgPrint("Fuser Error: CreateFile failed %ws: %d\n",
-			GetRawDeviceName(FuserInstance->DeviceName), GetLastError());
+			FuserInstance->RawDevice, GetLastError());
 		result = -1;
 		_endthreadex(result);
 		return result;
@@ -264,28 +265,19 @@ DeleteFuserInstance(PFUSER_INSTANCE Instance)
 
 
 
-
-
-LPCWSTR
-GetRawDeviceName(LPCWSTR	DeviceName)
-{
-	static WCHAR rawDeviceName[MAX_PATH];
-	wcscpy_s(rawDeviceName, MAX_PATH, L"\\\\.");
-	wcscat_s(rawDeviceName, MAX_PATH, DeviceName);
-	return rawDeviceName;
-}
-
-
-
 // ask driver to release all pending IRP to prepare for Unmount.
 BOOL
 SendReleaseIRP(
 	LPCWSTR	DeviceName)
 {
 	ULONG	returnedLength;
+	WCHAR rawDeviceName[MAX_PATH];
+	wcscpy_s(rawDeviceName, MAX_PATH, L"\\\\.");
+	wcscat_s(rawDeviceName, MAX_PATH, DeviceName);
+	
 	DbgPrint("send release\n");
 	if (!SendToDevice(
-				GetRawDeviceName(DeviceName),
+				rawDeviceName,
 				IOCTL_EVENT_RELEASE,
 				NULL,
 				0,
@@ -356,7 +348,7 @@ SendToDevice(
 }
 
 
-BOOL CheckMountPoint(LPCWSTR MountPoint) {
+BOOL CheckMountPoint(LPWSTR MountPoint) {
 	ULONG	length = wcslen(MountPoint);
 	
 	//MountPoint always starts with "?:\"	
@@ -366,13 +358,10 @@ BOOL CheckMountPoint(LPCWSTR MountPoint) {
 	if (MountPoint[1] != L':' || MountPoint[2] != L'\\' )
 		return FALSE;
 	
-	/* TODO: TODO: Accept lowercase, or convert
 	if (MountPoint[0] >= L'a' && MountPoint[0] <=L'z'){
 		//Driverletter lowercase, convert to uppercase:
-		MountPoint[0] = L'x';
-		//towlower   32
+		MountPoint[0] -= 32;
 	}
-	*/
 	
 	if (!(MountPoint[0] >= L'A' && MountPoint[0] <=L'Z')){
 		return FALSE;
@@ -430,9 +419,18 @@ FuserStart(PFUSER_INSTANCE Instance, ULONG MountFlags)
 	} else if (driverInfo.Status == FUSER_MOUNTED) {
 		Instance->MountId = driverInfo.MountId;
 		Instance->DeviceNumber = driverInfo.DeviceNumber;
+		
+		// TODO: Remove completely as soon as DeviceName is never used again
 		wcscpy_s(Instance->DeviceName,
 				sizeof(Instance->DeviceName) / sizeof(WCHAR),
 				driverInfo.DeviceName);
+
+
+		wcscpy_s(Instance->RawDevice, sizeof(Instance->RawDevice) / sizeof(WCHAR), L"\\\\.");
+		wcscat_s(Instance->RawDevice, sizeof(Instance->RawDevice) / sizeof(WCHAR), driverInfo.DeviceName);
+		
+				
+		
 		return TRUE;
 	}
 
@@ -507,17 +505,17 @@ int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
 	ULONG					threadNum = 0;
 	ULONG					i;
 	HANDLE					device;
-	HANDLE					threadIds[FUSER_MAX_THREAD];	
+	HANDLE					threadIds[FUSER_THREADS_MAX];	
 	PFUSER_INSTANCE 		instance;			
 	PFUSER_EVENT_CALLBACKS	FuserEvents;
-	
+	WCHAR 					NewMountPoint[MAX_PATH];
 	
 	if (MountParameter->StructVersion != 1){
 		//StructVersion incompatible, in future version must here implemetation of convert the struct
 		return FUSER_DEVICEMOUNT_VERSION_ERROR;
 	}
 	
-	FuserEvents  = (PFUSER_EVENT_CALLBACKS)malloc(sizeof(FUSER_EVENT_CALLBACKS));	 // TODO: use free
+	FuserEvents  = (PFUSER_EVENT_CALLBACKS)malloc(sizeof(FUSER_EVENT_CALLBACKS));
 	ZeroMemory(FuserEvents, sizeof(FUSER_EVENT_CALLBACKS));
 		
 	if (!LoadEventHandler(MountParameter, FuserEvents)){
@@ -540,16 +538,16 @@ int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
 		DbgPrintW(L"Fuser: debug mode on, output=stderr\n");		
 	}
 
-	if (MountParameter->ThreadsCount == 0) 
-		MountParameter->ThreadsCount = 5;
+	if (MountParameter->ThreadsCount <= 0) 
+		MountParameter->ThreadsCount = FUSER_THREADS_DEFAULT;
 
-	if ( MountParameter->ThreadsCount > FUSER_MAX_THREAD-1) {
-		// FUSER_MAX_THREAD includes FuserKeepAlive-Thread, so available thread is FUSER_MAX_THREAD -1		
-		MountParameter->ThreadsCount = FUSER_MAX_THREAD-1;
+	if ( MountParameter->ThreadsCount > FUSER_THREADS_MAX) {		
+		MountParameter->ThreadsCount = FUSER_THREADS_MAX;
 	}
 	
 	
-	if (!CheckMountPoint(MountParameter->MountPoint)){
+	wcscpy_s(NewMountPoint,  MAX_PATH / sizeof(WCHAR), MountParameter->MountPoint);
+	if (!CheckMountPoint(NewMountPoint)){
 		free(FuserEvents);
 		return FUSER_DEVICEMOUNT_BAD_MOUNT_POINT_ERROR; 
 	}
@@ -575,7 +573,7 @@ int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
 	// create an instance and fill the values:	
 	instance = NewFuserInstance();	
 	instance->FuserEvents = FuserEvents;	
-	wcscpy_s(instance->MountPoint, sizeof(instance->MountPoint) / sizeof(WCHAR), MountParameter->MountPoint);
+	wcscpy_s(instance->MountPoint, sizeof(instance->MountPoint) / sizeof(WCHAR), NewMountPoint);
 	
 
 	if (!FuserStart(instance, MountParameter->Flags)) { //This method creates the device for the new drive
@@ -583,7 +581,7 @@ int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
 		return FUSER_DEVICEMOUNT_DRIVER_START_ERROR;
 	}
 		
-	if (!FuserMount(instance->MountPoint, instance->DeviceName,  MountParameter->Flags & FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT  )) {
+	if (!FuserMount(instance->MountPoint, instance->DeviceName)) {
 		SendReleaseIRP(instance->DeviceName);
 		FuserDbgPrint("Fuser Error: DefineDosDevice Failed\n");
 		free(FuserEvents);
@@ -591,24 +589,12 @@ int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
 	}
 				
 	if (FuserEvents->Mount) {
-		FuserEvents->Mount(instance->MountPoint, instance->DeviceName);
+		FuserEvents->Mount(instance->MountPoint, instance->DeviceName, instance->RawDevice);
 	}
 		
 	DbgPrintW(L"mounted: %s -> %s\n", instance->MountPoint, instance->DeviceName);
 	
 	//Device created and mounted
-	
-	
-	// starting keep-alive-thread:
-	threadIds[threadNum++] = (HANDLE)_beginthreadex(
-		NULL, // Security Atributes
-		0, //stack size
-		FuserKeepAlive,
-		instance, // param
-		0, // create flag
-		NULL
-	);
-	
 	
 	for (i = 0; i < MountParameter->ThreadsCount; ++i) {
 		threadIds[threadNum++] = (HANDLE)_beginthreadex(
@@ -638,27 +624,6 @@ int FUSERAPI FuserDeviceMount(PFUSER_MOUNT_PARAMETER MountParameter)
 	free(FuserEvents);
     return FUSER_DEVICEMOUNT_SUCCESS;
 }
-
-
-
-
-
-/* TODO: Remove and check whether references should also be removed. ->IOCTL_SET_DEBUG_MODE
-BOOL
-FuserSetDebugMode(
-	ULONG	Mode)
-{
-	ULONG returnedLength;
-	return SendToDevice(
-		FUSER_GLOBAL_DEVICE_NAME,
-		IOCTL_SET_DEBUG_MODE,
-		&Mode,
-		sizeof(ULONG),
-		NULL,
-		0,
-		&returnedLength);
-}
-*/
 
 
 VOID
@@ -725,7 +690,7 @@ GetFuserOpenInfo(
 	if (openInfo != NULL) {
 		openInfo->OpenCount++;
 		openInfo->EventContext = EventContext;
-		openInfo->FuserInstance = FuserInstance;
+		//openInfo->FuserInstance = FuserInstance; TODO: Remove
 	}
 	LeaveCriticalSection(&FuserInstance->CriticalSection);
 	return openInfo;

@@ -1105,10 +1105,10 @@ namespace FuserNet
         }
 
 
-        public Win32Returncode Mount(string MountPoint, string DeviceName) {
+        public Win32Returncode Mount(string MountPoint, string RawDevice) {
             // forward to the virtual drive
             try {
-                this.drive.Mounted(MountPoint, DeviceName);
+                this.drive.Mounted(MountPoint, RawDevice);
             } catch {                
             }
             return Win32Returncode.SUCCESS;

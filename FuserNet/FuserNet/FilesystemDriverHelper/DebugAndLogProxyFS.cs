@@ -413,13 +413,13 @@ namespace FuserNet
             }
         }
 
-        public Win32Returncode Mount(string MountPoint, string DeviceName) {
+        public Win32Returncode Mount(string MountPoint, string RawDevice) {
             string funcname = "Mount";
-            string param = "MP: " + MountPoint + " DN: " + DeviceName;
+            string param = "MP: " + MountPoint + " DN: " + RawDevice;
 
             try {
                 //param = ;
-                Win32Returncode r = sourceSystem.Mount(MountPoint, DeviceName);
+                Win32Returncode r = sourceSystem.Mount(MountPoint, RawDevice);
 
                 LogEvent(funcname, r, param, null);
                 return r;

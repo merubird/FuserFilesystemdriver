@@ -559,8 +559,6 @@ DispatchDirectoryInformation(
 
 	if (IsListEmpty(openInfo->DirListHead)) {
 
-		DbgPrint("###FindFiles %04d\n", openInfo->EventId);
-
 		// if user defined FindFilesWithPattern
 		if (FuserInstance->FuserEvents->FindFilesWithPattern) {
 			LPCWSTR	pattern = L"*";

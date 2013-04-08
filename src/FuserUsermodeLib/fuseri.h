@@ -36,14 +36,16 @@ extern "C" {
 
 
 
-typedef struct _FUSER_INSTANCE {
+typedef struct _FUSER_INSTANCE { // TODO: struct rename and revise
 	// to ensure that unmount dispatch is called at once
 	CRITICAL_SECTION	CriticalSection;
 
 	// store CurrentDeviceName
 	// (when there are many mounts, each mount use 
 	// other DeviceName)
-	WCHAR	DeviceName[64];
+	WCHAR	DeviceName[64];  // e.g.:    \FuserDevice{b9892756-6a70-4e51-9eaf-9ef1e093b0e8} TODO: Check whether it can be removed completely
+	WCHAR	RawDevice[64];  //  e.g.: \\.\FuserDevice{b9892756-6a70-4e51-9eaf-9ef1e093b0e8}
+	
 	WCHAR	MountPoint[MAX_PATH];
 
 	ULONG	DeviceNumber; // TODO: clarify why and for what
@@ -55,13 +57,11 @@ typedef struct _FUSER_INSTANCE {
 } FUSER_INSTANCE, *PFUSER_INSTANCE;
 
 
-typedef struct _FUSER_OPEN_INFO { // TODO: Revise
-	BOOL			IsDirectory;
-	ULONG			OpenCount;
+typedef struct _FUSER_OPEN_INFO { // TODO: struct rename
 	PEVENT_CONTEXT	EventContext;
-	PFUSER_INSTANCE	FuserInstance;
-	ULONG64			UserContext;
-	ULONG			EventId;
+	ULONG64			UserContext;  // TODO: Change concept, think about something better, rethink
+	BOOL			IsDirectory;
+	ULONG			OpenCount;	
 	PLIST_ENTRY		DirListHead;
 } FUSER_OPEN_INFO, *PFUSER_OPEN_INFO;
 
@@ -87,22 +87,12 @@ SendToDevice(
 	
 
 
-LPCWSTR
-GetRawDeviceName(LPCWSTR	DeviceName);	
-
-
-
 BOOL
 FuserMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName,
-	BOOL    UseHeartbeatControl);
+	LPCWSTR	DeviceName);
 
 
-DWORD WINAPI
-FuserKeepAlive(
-	PVOID	Param);	
-	
 
 
 

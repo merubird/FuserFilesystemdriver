@@ -12,6 +12,7 @@ namespace FuserLowlevelDriver {
         private FuserHeartbeat heartbeat;
         private FuserHandlerManager hManager;
 
+        private string UsedMountPoint;
         private string volumelabel;
         private string filesystem;
         private uint serialnumber;
@@ -23,6 +24,7 @@ namespace FuserLowlevelDriver {
            
         public FuserDevice(IFuserFilesystemDevice fsDevice, string Volumelabel, string Filesystem, uint Serialnumber) {
             this.fsDevice = fsDevice;
+            this.UsedMountPoint = "";
             this.heartbeat = null;
             this.hManager = new FuserHandlerManager();
             this.FuserEventLoader = null;
@@ -38,6 +40,10 @@ namespace FuserLowlevelDriver {
             if (this.heartbeat != null) {
                 this.heartbeat.Stop();
             }
+        }
+
+        public string getMountPoint() {
+            return this.UsedMountPoint;
         }
 
         private int ConvReturnCodeToInt(Win32Returncode rcode) {
@@ -541,8 +547,8 @@ namespace FuserLowlevelDriver {
         }
 
 
-        private delegate int MountDelegate(IntPtr rawMountPoint, IntPtr rawDeviceName);
-        public int           Mount        (IntPtr rawMountPoint, IntPtr rawDeviceName){            
+        private delegate int MountDelegate(IntPtr rawMountPoint, IntPtr rawDeviceName, IntPtr rawRawDevice);
+        public int           Mount        (IntPtr rawMountPoint, IntPtr rawDeviceName, IntPtr rawRawDevice){            
             try {
                 if (this.heartbeat != null) {
                     return 0;
@@ -550,10 +556,12 @@ namespace FuserLowlevelDriver {
             
                 string mountPoint = Marshal.PtrToStringUni(rawMountPoint);
                 string deviceName = Marshal.PtrToStringUni(rawDeviceName);
+                string rawDevice = Marshal.PtrToStringUni(rawRawDevice);
 
                 this.heartbeat = new FuserHeartbeat(mountPoint, deviceName); // start Heartbeat
 
-                return ConvReturnCodeToInt(this.fsDevice.Mount(mountPoint, deviceName));
+                this.UsedMountPoint = mountPoint;
+                return ConvReturnCodeToInt(this.fsDevice.Mount(mountPoint, rawDevice));
             } catch (Exception e) {
                 //System.Diagnostics.Debugger.Break();
                 this.fsDevice.LogErrorMessage("Mount", e.Message);

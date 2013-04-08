@@ -53,8 +53,7 @@ extern "C" {
 	#define FUSER_MOUNT_PARAMETER_FLAG_DEBUG			1   // ouput debug message
 	#define FUSER_MOUNT_PARAMETER_FLAG_STDERR			2   // ouput debug message to stderr
 	#define FUSER_MOUNT_PARAMETER_FLAG_USEADS			4	// use Alternativ Data Stream (e.g. C:\TEMP\TEST.TXT:ADS.file)
-	#define FUSER_MOUNT_PARAMETER_FLAG_HEARTBEAT 		8 	//  use heartbeat-check for device alive-control
-	#define FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE 	16  //  DeviceType: Removable-Device	
+	#define FUSER_MOUNT_PARAMETER_FLAG_TYPE_REMOVABLE 	8  //  DeviceType: Removable-Device	
 // <- C#.Net Library ->
 
 // <- C#.Net Library ->
@@ -98,24 +97,21 @@ extern "C" {
 // <- C#.Net Library ->
 
 
-
-
-
-
 // TODO: Adapt name also in fuser.dll and FuserNet
-// TODO: Also revise function, what is really used
 typedef struct _FUSER_FILE_INFO {   // <- C#.Net Library ->
-	ULONG64	Context;      // FileSystem can use this variable
 	ULONG64	FuserContext; // Don't touch this	
+	ULONG64	Context;      // FileSystem can use this variable		
 	ULONG	ProcessId;    // process id for the thread that originally requested a given I/O operation
+	
 	UCHAR	IsDirectory;  // requesting a directory file
 	UCHAR	DeleteOnClose; // Delete on when "cleanup" is called
 	UCHAR	PagingIo;	// Read or write is paging IO.
 	UCHAR	SynchronousIo;  // Read or write is synchronous IO.
 	UCHAR	Nocache;
 	UCHAR	WriteToEndOfFile; //  If true, write to the current end of file instead of Offset parameter.
-
 } FUSER_FILE_INFO, *PFUSER_FILE_INFO;
+
+
 
 
 // FillFileData
@@ -130,7 +126,7 @@ typedef int (WINAPI *PFillFindData) (PWIN32_FIND_DATAW, PFUSER_FILE_INFO);
 	typedef struct _FUSER_EVENT { 		
 		union {
 			ULONG CallPointer;
-			int (FUSER_CALLBACK *Mount) 				(LPCWSTR, LPCWSTR );
+			int (FUSER_CALLBACK *Mount) 				(LPCWSTR, LPCWSTR, LPCWSTR );
 			int (FUSER_CALLBACK *Unmount) 				(PFUSER_FILE_INFO);
 			int (FUSER_CALLBACK *GetVolumeInformation)	(LPWSTR, DWORD,	LPDWORD, LPDWORD, LPDWORD, LPWSTR, DWORD, PFUSER_FILE_INFO);
 			int (FUSER_CALLBACK *GetDiskFreeSpace) 		(PULONGLONG, PULONGLONG, PULONGLONG, PFUSER_FILE_INFO);	
@@ -180,7 +176,8 @@ typedef struct _FUSER_EVENT_CALLBACKS {
 
 	int (FUSER_CALLBACK *Mount) (
 		LPCWSTR, // MountPoint
-		LPCWSTR  // DeviceName
+		LPCWSTR, // DeviceName
+		LPCWSTR  // RawDevice
 		);		
 
 	int (FUSER_CALLBACK *Unmount) (
@@ -395,17 +392,8 @@ FuserDeviceUnmount(
 	
 
 
-
-// FuserResetTimeout
-//   extends the time out of the current IO operation in driver.
-// TODO: Check if method can be removed or implemented differently -> FuserKeepAlive , remove export in fuser.def too.
-BOOL 
-FuserResetTimeout(
-	ULONG				Timeout,	// timeout in millisecond
-	PFUSER_FILE_INFO	FuserFileInfo);
-
 	
-//Sends the heartbeat signal
+//send a new heartbeat-signal to the deviceAgent
 BOOL FUSERAPI
 FuserSendHeartbeat(LPCWSTR MountPoint, LPCWSTR DeviceName);
 	

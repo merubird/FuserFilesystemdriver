@@ -256,8 +256,6 @@ DispatchSetInformation(
 	eventInfo = DispatchCommon(
 		EventContext, sizeOfEventInfo, FuserInstance, &fileInfo, &openInfo);
 
-	DbgPrint("###SetFileInfo %04d\n", openInfo != NULL ? openInfo->EventId : -1);
-
 	switch (EventContext->SetFile.FileInformationClass) {
 	case FileAllocationInformation:
 		status = FuserSetAllocationInformation(

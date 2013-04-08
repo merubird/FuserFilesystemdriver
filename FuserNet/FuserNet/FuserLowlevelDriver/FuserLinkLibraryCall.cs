@@ -38,7 +38,7 @@ namespace FuserLowlevelDriver {
         }
 
 
-        public static int DeviceUnmount(string mountPoint) {
+        public static int DeviceUnmount(string mountPoint) {            
             return DLLCoreCall.FuserDeviceUnmount(Marshal.StringToHGlobalUni(mountPoint));
         }
                   

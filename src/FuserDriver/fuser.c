@@ -31,7 +31,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 UNICODE_STRING				FcbFileNameNull;
-ULONG 						g_Debug = FUSER_DEBUG_DEFAULT;
+ULONG 						DebugMode = FUSER_DEBUGMODE;
 
 NPAGED_LOOKASIDE_LIST		FuserIrpEntryLookasideList;
 FAST_IO_CHECK_IF_POSSIBLE 	FuserFastIoCheckIfPossible;

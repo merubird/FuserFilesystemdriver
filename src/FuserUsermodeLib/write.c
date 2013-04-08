@@ -82,8 +82,6 @@ DispatchWrite(
 
 	CheckFileName(EventContext->Write.FileName);
 
-	DbgPrint("###WriteFile %04d\n", openInfo != NULL ? openInfo->EventId : -1);
-
 	if (FuserInstance->FuserEvents->WriteFile) {
 		status = FuserInstance->FuserEvents->WriteFile(
 						EventContext->Write.FileName,
