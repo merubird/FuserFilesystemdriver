@@ -73,6 +73,9 @@ BOOL
 SendReleaseIRP(
 	LPCWSTR DeviceName);
 
+BOOL SendReleaseIRPraw(
+	LPCWSTR	rawDeviceName);
+
 
 BOOL
 SendToDevice(

@@ -46,14 +46,17 @@ namespace FuserLowlevelDriver {
             return DLLCoreCall.FuserSendHeartbeat(Marshal.StringToHGlobalUni(MountPoint), Marshal.StringToHGlobalUni(DeviceName));            
         }
 
-        public static string FuserVersion() {
-            // TODO: add trycatch
-            VersionUnion n = new VersionUnion();
-            n.BinaryVersion = DLLCoreCall.FuserVersion();
-            if (n.BinaryVersion == 0) {
+        public static string FuserVersion() {            
+            try {
+                VersionUnion n = new VersionUnion();
+                n.BinaryVersion = DLLCoreCall.FuserVersion();
+                if (n.BinaryVersion == 0) {
+                    return "";
+                } else {
+                    return n.Major + "." + n.Minor + "." + n.Revision;
+                }
+            } catch {
                 return "";
-            } else {
-                return n.Major + "." + n.Minor + "." + n.Revision;
             }
         }
 

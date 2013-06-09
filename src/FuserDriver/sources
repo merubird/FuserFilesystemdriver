@@ -22,7 +22,6 @@ SOURCES=fuser.c \
 	fscontrol.c \
 	notification.c \
 	security.c \
-	access.c \
 	fuser.rc
 
 

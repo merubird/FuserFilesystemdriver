@@ -121,8 +121,8 @@ FuserDeviceUnmount(
 	DbgPrintW(L"FuserDeviceUnmount %ws\n", MountPoint);
 	result = FuserAgentControl(&control);
 	if (result) {
-		DbgPrint("FuserControl recieved DeviceName:%ws\n", control.DeviceName);
-		SendReleaseIRP(control.DeviceName);
+		DbgPrint("FuserControl recieved DeviceName:%ws\n", control.RawDeviceName);
+		SendReleaseIRPraw(control.RawDeviceName);
 	} else {
 		DbgPrint("FuserDeviceUnmount failed\n");
 	}
@@ -199,7 +199,10 @@ FuserMount(
 	// TODO: Add Version to control and check in fuserdeviceagent
 	
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
-	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
+		
+	// TODO: Remove and pass through parameter as RAW
+	wcscpy_s(control.RawDeviceName, sizeof(control.RawDeviceName) / sizeof(WCHAR), L"\\\\.");
+	wcscat_s(control.RawDeviceName, sizeof(control.RawDeviceName) / sizeof(WCHAR), DeviceName);
 
 	return  FuserAgentControl(&control);
 }

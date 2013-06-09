@@ -38,7 +38,7 @@ DispatchQuerySecurity(
 	CheckFileName(EventContext->Security.FileName);
 
 	eventInfo = DispatchCommon(EventContext, eventInfoLength, FuserInstance, &fileInfo, &openInfo);
-	
+	// TODO: direct return "Not Implemented"
 
 	// TODO: remove the stuff with the version
 	if (FuserInstance->FuserEvents->GetFileSecurity) {

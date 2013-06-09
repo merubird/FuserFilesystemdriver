@@ -124,8 +124,8 @@ FuserDbgPrintW(LPCWSTR format, ...)
 
 typedef struct _FUSER_CONTROL {
 	ULONG	Type;
-	WCHAR	MountPoint[MAX_PATH];
-	WCHAR	DeviceName[64];
+	WCHAR	MountPoint[MAX_PATH];	
+	WCHAR	RawDeviceName[64];
 	ULONG	Option;
 	ULONG	Status;
 

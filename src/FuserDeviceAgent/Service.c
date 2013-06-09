@@ -113,15 +113,16 @@ InsertMountEntry(PFUSER_CONTROL FuserControl)
 
 PMOUNT_ENTRY
 FindMountEntry(PFUSER_CONTROL	FuserControl)
-{ // TODO: revise, to all with raw-device
+{
 	PLIST_ENTRY		listEntry;
 	PMOUNT_ENTRY	mountEntry;
 	BOOL			useMountPoint = wcslen(FuserControl->MountPoint) > 0;
 	BOOL			found = FALSE;
 
-	if (!useMountPoint && wcslen(FuserControl->DeviceName) == 0) {
+	if (!useMountPoint && wcslen(FuserControl->RawDeviceName) == 0) {
 		return NULL;
 	}
+	
 
 	EnterCriticalSection(&g_CriticalSection);
 
@@ -133,7 +134,7 @@ FindMountEntry(PFUSER_CONTROL	FuserControl)
 				break;
 			}
 		} else {
-			if (wcscmp(FuserControl->DeviceName, mountEntry->MountControl.DeviceName) == 0) {
+			if (wcscmp(FuserControl->RawDeviceName, mountEntry->MountControl.RawDeviceName) == 0) {
 				found = TRUE;
 				break;
 			}
@@ -144,7 +145,7 @@ FindMountEntry(PFUSER_CONTROL	FuserControl)
 
 	if (found) {
 		DbgPrintW(L"FindMountEntry %s -> %s\n",
-			mountEntry->MountControl.MountPoint, mountEntry->MountControl.DeviceName);
+			mountEntry->MountControl.MountPoint, mountEntry->MountControl.RawDeviceName);
 		return mountEntry;
 	} else {
 		return NULL;
@@ -174,9 +175,10 @@ FuserControlFind(PFUSER_CONTROL Control)
 	mountEntry = FindMountEntry(Control);
 	if (mountEntry == NULL) {
 		Control->Status = FUSER_CONTROL_FAIL;
-	} else {
-		wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-				mountEntry->MountControl.DeviceName);
+	} else {		
+		wcscpy_s(Control->RawDeviceName, sizeof(Control->RawDeviceName) / sizeof(WCHAR),
+				mountEntry->MountControl.RawDeviceName);				
+				
 		wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
 				mountEntry->MountControl.MountPoint);
 		Control->Status = FUSER_CONTROL_SUCCESS;
@@ -200,9 +202,11 @@ FuserControlList(PFUSER_CONTROL Control)
 		listEntry != &g_MountList;
 		listEntry = listEntry->Flink) {
 		mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
-		if (Control->Option == index++) {
-			wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-					mountEntry->MountControl.DeviceName);
+		if (Control->Option == index++) {			
+			wcscpy_s(Control->RawDeviceName, sizeof(Control->RawDeviceName) / sizeof(WCHAR),
+					mountEntry->MountControl.RawDeviceName);
+					
+					
 			wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
 					mountEntry->MountControl.MountPoint);
 			Control->Status = FUSER_CONTROL_SUCCESS;
@@ -229,7 +233,7 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 		DbgPrintW(L"FuserControl Mount\n");
 
 		
-		if (FuserControlMount(Control->MountPoint, Control->DeviceName )) {			
+		if (FuserControlMount(Control->MountPoint, Control->RawDeviceName )) {
 			Control->Status = FUSER_CONTROL_SUCCESS;
 			mountEntry = InsertMountEntry(Control);
 			
@@ -259,10 +263,12 @@ static VOID FuserControl(PFUSER_CONTROL Control)
 
 		if (FuserControlUnmount(mountEntry->MountControl.MountPoint)) {
 			Control->Status = FUSER_CONTROL_SUCCESS;
-			if (wcslen(Control->DeviceName) == 0) {
-				wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-						mountEntry->MountControl.DeviceName);
+		
+			if (wcslen(Control->RawDeviceName) == 0) {
+				wcscpy_s(Control->RawDeviceName, sizeof(Control->RawDeviceName) / sizeof(WCHAR),
+						mountEntry->MountControl.RawDeviceName);
 			}
+			
 			HeartbeatStop(mountEntry);
 			RemoveMountEntry(mountEntry);
 		} else {
@@ -341,13 +347,13 @@ UnmountAll()
 		} else {
 			ZeroMemory(&control, sizeof(FUSER_CONTROL));
 			control.Type = FUSER_CONTROL_UNMOUNT;
-						
-			wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), umEntry->MountControl.DeviceName);
-			wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), umEntry->MountControl.MountPoint);
+			
+			wcscpy_s(control.RawDeviceName, sizeof(control.RawDeviceName) / sizeof(WCHAR), umEntry->MountControl.RawDeviceName);
+			wcscpy_s(control.MountPoint,    sizeof(control.MountPoint)    / sizeof(WCHAR), umEntry->MountControl.MountPoint);
 		
 			FuserControl(&control);
 			if (control.Status == FUSER_CONTROL_SUCCESS){
-				SendReleaseIRP(control.DeviceName);
+				SendReleaseIRPraw(control.RawDeviceName);
 			} else {
 				break;
 			}
@@ -472,8 +478,10 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 
 					ZeroMemory(&unmount, sizeof(FUSER_CONTROL));
 					unmount.Type = FUSER_CONTROL_UNMOUNT;
-					wcscpy_s(unmount.DeviceName, sizeof(unmount.DeviceName) / sizeof(WCHAR),
-							eventContext.Unmount.DeviceName);
+					//wcscpy_s(unmount.rmDeviceName, sizeof(unmount.rmDeviceName) / sizeof(WCHAR), eventContext.Unmount.DeviceName); TODO: first Unmount.Device with RawDevice
+					wcscpy_s(unmount.RawDeviceName, sizeof(unmount.RawDeviceName) / sizeof(WCHAR), L"\\\\.");
+					wcscat_s(unmount.RawDeviceName, sizeof(unmount.RawDeviceName) / sizeof(WCHAR), eventContext.Unmount.DeviceName);
+						
 					FuserControl(&unmount);
 				} else {
 					DbgPrintW(L"DeviceAgent: Unmount error\n", control.Type);

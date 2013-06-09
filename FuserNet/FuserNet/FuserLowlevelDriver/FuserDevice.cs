@@ -6,8 +6,10 @@ using System.Runtime.InteropServices;
 using FuserNet;
 using ComTypes = System.Runtime.InteropServices.ComTypes;
 
+
+
 namespace FuserLowlevelDriver {
-    internal class FuserDevice {
+    internal class FuserDevice {        
         private IFuserFilesystemDevice fsDevice;        
         private FuserHeartbeat heartbeat;
         private FuserHandlerManager hManager;
@@ -15,14 +17,12 @@ namespace FuserLowlevelDriver {
         private string UsedMountPoint;
         private string volumelabel;
         private string filesystem;
-        private uint serialnumber;
-
-        private FuserNet.ACLProxy aclProxy = new FuserNet.ACLProxy(); // TODO: remove
+        private uint serialnumber;              
 
         private Stack<FuserEventHandler> FuserEventLoader;
         private List<FuserEventHandler> FuserEvents; // to prevent garbage collector
            
-        public FuserDevice(IFuserFilesystemDevice fsDevice, string Volumelabel, string Filesystem, uint Serialnumber) {
+        public FuserDevice(IFuserFilesystemDevice fsDevice, string Volumelabel, string Filesystem, uint Serialnumber) {            
             this.fsDevice = fsDevice;
             this.UsedMountPoint = "";
             this.heartbeat = null;
@@ -137,8 +137,11 @@ namespace FuserLowlevelDriver {
                 this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_DELETE_FILE,           (FuserDevice.DeleteFileDelegate)this.DeleteFile));
                 this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_DELETE_DIRECTORY,      (FuserDevice.DeleteDirectoryDelegate)this.DeleteDirectory));
                 this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_MOVE_FILE,             (FuserDevice.MoveFileDelegate)this.MoveFile));
-                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_GET_FILESECURITY,      (FuserDevice.GetFileSecurityDelegate)this.GetFileSecurity)); // TODO: remove
-                this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_FILESECURITY,      (FuserDevice.SetFileSecurityDelegate)this.SetFileSecurity)); // TODO: remove
+
+                
+                // this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_GET_FILESECURITY, (FuserDevice.GetFileSecurityDelegate)this.GetFileSecurity));
+                // this.FuserEventLoader.Push(new FuserEventHandler(FuserDefinition.FUSER_EVENT.FUSER_EVENT_SET_FILESECURITY, (FuserDevice.SetFileSecurityDelegate)this.SetFileSecurity));
+                
             }
             
             if (this.FuserEventLoader.Count > 0) {
@@ -537,6 +540,8 @@ namespace FuserLowlevelDriver {
                 
                 //rawFileSystemFlags = (uint) (FuserDefinition.FileSystemFlags.FILE_CASE_PRESERVED_NAMES | FuserDefinition.FileSystemFlags.FILE_UNICODE_ON_DISK | FuserDefinition.FileSystemFlags.FILE_CASE_SENSITIVE_SEARCH);
                 rawFileSystemFlags = 7; // The above code corresponds to 7
+                
+                //    rawFileSystemFlags += 8;//ACL
                 rawMaximumComponentLength = 256;
                
                 return ConvReturnCodeToInt(Win32Returncode.SUCCESS);
@@ -576,23 +581,7 @@ namespace FuserLowlevelDriver {
             return 0;
         }
 
-        private delegate int GetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public           int GetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
-            try {
-                if (this.aclProxy != null) {
-                    return this.aclProxy.GetFileSecurity(rawRequestedInformation, ref rawSecurityDescriptor, (int)rawSecurityDescriptorLength, ref rawSecurityDescriptorLengthNeeded);
-                }
-            } catch (Exception e) {
-                this.fsDevice.LogErrorMessage("GetFileSecurity", e.Message);
-                return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
-            }
-            return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
-        }
-
-        private delegate int SetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
-        public           int SetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
-            return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
-        }
+        
 
     }
 

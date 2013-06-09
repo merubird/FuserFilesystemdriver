@@ -36,6 +36,8 @@ THE SOFTWARE.
 #define SERVICECONTROL_DELETE   3
 
 
+//wcscpy_s(temp, MAX_PATH, control.RawDeviceName + 3); // from Raw device becomes DeviceName
+
 // TODO: Include a function so that the driver can be unloaded -> update without reboot
 
 VOID DisplayMessage(LPCWSTR message)
@@ -65,7 +67,7 @@ VOID ShowMountList()
 {	
 	WCHAR  buffer[MAX_BUFFER_SIZE];
 	WCHAR  partBuff[MAX_BUFFER_SIZE];
-
+	
 	FUSER_CONTROL control;
 	ULONG index = 0;
 	ZeroMemory(&control, sizeof(FUSER_CONTROL));
@@ -76,12 +78,17 @@ VOID ShowMountList()
 	control.Status = FUSER_CONTROL_SUCCESS;
 
 	wcscpy_s(buffer, MAX_BUFFER_SIZE, L"Mountpoint list:\n\n");
+		
+	
+	
+	
 	
 	while(FuserAgentControl(&control)) {
 		if (control.Status == FUSER_CONTROL_SUCCESS) {
 			ZeroMemory(partBuff, sizeof(partBuff));
+						
 			_snwprintf(partBuff,100, L"[%d] MountPoint: %s  \t> Device: %s\n",
-				control.Option, control.MountPoint, control.DeviceName);
+				control.Option, control.MountPoint, control.RawDeviceName);
 						
 			wcscat_s(buffer, MAX_BUFFER_SIZE, partBuff);				
 			control.Option++;

@@ -36,8 +36,11 @@ FuserSendHeartbeat(
 	ZeroMemory(&control, sizeof(FUSER_CONTROL));
 	control.Type = FUSER_CONTROL_HEARTBEAT;
 
-	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
-	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
+	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);	
+		
+	// TODO: Remove and pass through parameter as RAW
+	wcscpy_s(control.RawDeviceName, sizeof(control.RawDeviceName) / sizeof(WCHAR), L"\\\\.");
+	wcscat_s(control.RawDeviceName, sizeof(control.RawDeviceName) / sizeof(WCHAR), DeviceName);
 
 	status = FuserAgentControl(&control);
 	

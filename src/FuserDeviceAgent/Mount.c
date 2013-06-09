@@ -194,9 +194,13 @@ CreateMountPoint(
 BOOL
 FuserControlMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName)
+	LPCWSTR	RawDeviceName)
 {
-	ULONG length = wcslen(MountPoint);
+	ULONG 	length = wcslen(MountPoint);
+	WCHAR	DeviceName[MAX_PATH];
+	
+	wcscpy_s(DeviceName, MAX_PATH, RawDeviceName + 3); // From Raw device becomes DeviceName
+	
 	if (length == 1 ||
 		(length == 2 && MountPoint[1] == L':') ||
 		(length == 3 && MountPoint[1] == L':' && MountPoint[2] == L'\\')) {

@@ -39,7 +39,7 @@ THE SOFTWARE.
 
 BOOL
 SendToDevice(
-	LPCWSTR	DeviceName,
+	LPCWSTR	rawDeviceName,
 	DWORD	IoControlCode,
 	PVOID	InputBuffer,
 	ULONG	InputLength,
@@ -53,7 +53,7 @@ SendToDevice(
 	ULONG	returnedLength;
 
 	device = CreateFile(
-				DeviceName,							// lpFileName
+				rawDeviceName,							// lpFileName
 				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
                 FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
                 NULL,                               // lpSecurityAttributes
@@ -65,7 +65,7 @@ SendToDevice(
     if (device == INVALID_HANDLE_VALUE) {
 		DWORD dwErrorCode = GetLastError();
 		DbgPrint("Fuser Error: Failed to open %ws with code %d\n",
-			DeviceName, dwErrorCode);
+			rawDeviceName, dwErrorCode);
         return FALSE;
     }
 
@@ -90,23 +90,18 @@ SendToDevice(
 	return TRUE;
 }
 
-
-
-
-
 // ask driver to release all pending IRP to prepare for Unmount.
 VOID
-SendReleaseIRP(
-	LPCWSTR	DeviceName)
+SendReleaseIRPraw(
+	LPCWSTR	rawDeviceName)
 {
 	ULONG	returnedLength;	
-	WCHAR rawDeviceName[MAX_PATH];
+	WCHAR rawDeviceName2[MAX_PATH];
 	
-	wcscpy_s(rawDeviceName, MAX_PATH, L"\\\\.");
-	wcscat_s(rawDeviceName, MAX_PATH, DeviceName);
+	wcscpy_s(rawDeviceName2, MAX_PATH, rawDeviceName);	
 	
 	SendToDevice(
-				rawDeviceName,
+				rawDeviceName2,
 				IOCTL_EVENT_RELEASE,
 				NULL,
 				0,
@@ -130,15 +125,13 @@ BOOL KeepAliveSendSignal(HANDLE device){
 		);	
 }
 
-HANDLE KeepAliveOpen(LPCWSTR DeviceName) {
+HANDLE KeepAliveOpen(LPCWSTR RawDeviceName) {
 	HANDLE	device;	
-	WCHAR rawDeviceName[MAX_PATH];
+	WCHAR rawDeviceName2[MAX_PATH];
 	
-	wcscpy_s(rawDeviceName, MAX_PATH, L"\\\\.");
-	wcscat_s(rawDeviceName, MAX_PATH, DeviceName);
-	
+	wcscpy_s(rawDeviceName2, MAX_PATH, RawDeviceName);
 	device = CreateFile(
-				rawDeviceName,
+				rawDeviceName2,
 				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
                 FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
                 NULL,                               // lpSecurityAttributes
@@ -159,7 +152,7 @@ HeartbeatCheck (PMOUNT_ENTRY mount)
 	int keepalive = HEARTBEAT_SENDKEEPALIVE_COUNT;
 	HANDLE device;	
 	
-	device = KeepAliveOpen(mount->MountControl.DeviceName);
+	device = KeepAliveOpen(mount->MountControl.RawDeviceName);
 	if (device == INVALID_HANDLE_VALUE){
 		//Device not found, unmount:
 		mount->HeartbeatAbort=TRUE;  unmount = TRUE;
@@ -194,7 +187,7 @@ HeartbeatCheck (PMOUNT_ENTRY mount)
 
 		if (FuserControlUnmount(mount->MountControl.MountPoint)) {
 			RemoveMountEntry(mount);
-			SendReleaseIRP(mount->MountControl.DeviceName);
+			SendReleaseIRPraw(mount->MountControl.RawDeviceName);
 		}
 	}
 	

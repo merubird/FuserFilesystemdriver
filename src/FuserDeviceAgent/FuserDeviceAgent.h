@@ -79,7 +79,7 @@ typedef struct _MOUNT_ENTRY {
 	
 } MOUNT_ENTRY, *PMOUNT_ENTRY;
 
-BOOL FuserControlMount(LPCWSTR MountPoint, LPCWSTR DeivceName);
+BOOL FuserControlMount(LPCWSTR MountPoint, LPCWSTR RawDeivceName);
 
 BOOL FuserControlUnmount(LPCWSTR MountPoint);
 
@@ -89,7 +89,7 @@ VOID HeartbeatStop(PMOUNT_ENTRY mount);
 
 VOID HeartbeatSetAliveSignal(PMOUNT_ENTRY mount);
 
-VOID SendReleaseIRP(LPCWSTR DeviceName);
+VOID SendReleaseIRPraw(LPCWSTR rawDeviceName);
 
 VOID RemoveMountEntry(PMOUNT_ENTRY MountEntry);
 

@@ -39,5 +39,29 @@ namespace FuserNet
         }
 
 
+
+        /*
+        private delegate int GetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int GetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawRequestedInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLength, ref uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+            if (useACLSupport) {
+                try {
+                    if (this.aclProxy != null) {
+                        return this.aclProxy.GetFileSecurity(rawRequestedInformation, ref rawSecurityDescriptor, (int)rawSecurityDescriptorLength, ref rawSecurityDescriptorLengthNeeded);
+                    }
+                } catch (Exception e) {
+                    this.fsDevice.LogErrorMessage("GetFileSecurity", e.Message);
+                    return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
+                }
+            }
+            return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
+        }
+
+        private delegate int SetFileSecurityDelegate(IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile);
+        public           int SetFileSecurity        (IntPtr rawFilename, ref FuserDefinition.SECURITY_INFORMATION rawSecurityInformation, ref FuserDefinition.SECURITY_DESCRIPTOR rawSecurityDescriptor, uint rawSecurityDescriptorLengthNeeded, ref FuserDefinition.FUSER_FILE_INFO rawHFile){
+            return ConvReturnCodeToInt(Win32Returncode.DEFAULT_UNKNOWN_ERROR);
+        }
+         */
+
+
     }
 }

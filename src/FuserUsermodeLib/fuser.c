@@ -291,6 +291,30 @@ SendReleaseIRP(
 	return TRUE;
 }
 
+// ask driver to release all pending IRP to prepare for Unmount.
+BOOL
+SendReleaseIRPraw(
+	LPCWSTR	rawDeviceName)
+{
+	ULONG	returnedLength;
+	WCHAR rawDeviceName2[MAX_PATH];
+	wcscpy_s(rawDeviceName2, MAX_PATH,rawDeviceName);	
+	
+	DbgPrint("send release\n");
+	if (!SendToDevice(
+				rawDeviceName2,
+				IOCTL_EVENT_RELEASE,
+				NULL,
+				0,
+				NULL,
+				0,
+				&returnedLength) ) {
+		
+		DbgPrint("Failed to unmount device:%ws\n", rawDeviceName);
+		return FALSE;
+	}
+	return TRUE;
+}
 
 
 
