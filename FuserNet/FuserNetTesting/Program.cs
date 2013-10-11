@@ -46,7 +46,7 @@ namespace Testsystem
             mountPoint = @"j:\";
             //mountPoint = @"C:\temp\ab";
 
-            Console.WriteLine("--------  StartFuser Drive -------");
+            Console.WriteLine("--------  Start Fuser Drive -------");
             Console.WriteLine("Version : " + FuserDriveMounter.GetFuserVersion());
             Console.WriteLine("Start: " + vdm.Mount(mountPoint));
                        
